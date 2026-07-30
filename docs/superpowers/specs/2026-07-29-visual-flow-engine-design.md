@@ -276,26 +276,34 @@ type CapabilityConfig struct {
 
 ## 10. 引擎生命周期
 
-引擎应支持同时管理多个流程定义，并且每个流程定义都可以独立运行、升级、暂停和停止。建议将引擎的职责拆成“管理层”和“实例层”两部分：
+引擎应支持同时管理多个流程定义，并且每个流程定义都可以独立运行、升级、暂停和停止。建议将职责明确划分为：
+
+- Engine：负责加载流程集合、统一调度、管理运行实例与生命周期。
+- FlowDefinition：负责自身的编译、版本管理与热更新。
 
 ```go
-func (e *Engine) Load(def FlowDefinition) error
-func (e *Engine) Compile(flowID string) error
-func (e *Engine) Run(flowID string) error
-func (e *Engine) Stop(flowID string) error
-func (e *Engine) Pause(flowID string) error
-func (e *Engine) Resume(flowID string) error
-func (e *Engine) Reload(flowID string, def FlowDefinition) error
+func (e *Engine) Load(defs ...FlowDefinition) error
+func (e *Engine) Run() error
+func (e *Engine) Stop() error
+func (e *Engine) Pause() error
+func (e *Engine) Resume() error
+```
+
+FlowDefinition 上则提供：
+
+```go
+func (f *FlowDefinition) Compile() (*CompiledFlow, error)
+func (f *FlowDefinition) Reload(next FlowDefinition) error
 ```
 
 ### 10.1 运行流程
 
-1. Load：将流程定义注册到引擎，按 FlowDefinition.ID 建立唯一引用。
-2. Compile：为指定 flowID 生成编译结果。
-3. Run：启动指定流程实例的执行。
-4. Stop：停止指定流程实例。
+1. Load：将一组 FlowDefinition 一次性注册到引擎。
+2. Compile：由 FlowDefinition 自己完成编译，生成可执行拓扑。
+3. Run：引擎启动已加载流程集合的执行。
+4. Stop：停止引擎上所有已启动的流程实例。
 5. Pause/Resume：支持暂停恢复。
-6. Reload：以新版本 FlowDefinition 替换旧版本，但不会影响已经运行中的实例。
+6. Reload：用新的 FlowDefinition 替换同一个 flowID 的旧版本，但不会影响已经运行中的实例。
 
 ### 10.2 热更新策略
 
@@ -305,7 +313,7 @@ func (e *Engine) Reload(flowID string, def FlowDefinition) error
 - 同一个 flowID 的新版本配置会被视为新的“定义版本”。
 - 已经启动的运行实例继续使用旧版本编译结果。
 - 新的调度请求使用最新版本定义。
-- 需要通过版本号或 revision 字段来区分定义版本，避免冲突。
+- 通过版本号或 revision 字段区分定义版本，避免冲突。
 
 ```go
 type FlowVersion struct {
