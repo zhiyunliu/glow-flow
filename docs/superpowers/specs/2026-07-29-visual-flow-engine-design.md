@@ -6,7 +6,7 @@
 
 - 支持通过配置文件或 JSON 描述流程图。
 - 每个节点通过注册方式接入引擎。
-- 节点之间通过消息传递进行协作。
+- 节点之间通过执行结果中的数据和关系类型进行协作。
 - 支持节点能力与并发量控制。
 - 运行时可编译、验证、执行、暂停和停止流程。
 - 保留足够的扩展性，后续可接入可视化编辑器、状态存储和分布式调度。
@@ -15,7 +15,7 @@
 
 1. 以“配置驱动 + 插件注册”为核心。
 2. 把“流程定义”和“节点执行逻辑”解耦。
-3. 运行时采用轻量级消息通道，避免节点之间直接耦合。
+3. 运行时通过调度器传递数据，避免节点之间直接耦合。
 4. 默认优先支持单进程内存执行，后续可插入持久化状态存储。
 5. 采用显式接口和最小抽象，方便未来扩展为分布式/并发执行。
 
@@ -37,7 +37,7 @@ glowflow/
   registry.go         // 节点注册中心
   define.go           // 流程定义与配置结构
   node.go             // 节点接口与编译结果
-  dispatcher.go       // 调度、路由、消息分发
+    dispatcher.go       // 调度、关系路由、数据分发
   worker.go           // 执行工作单元
   context.go          // 运行上下文
   options.go          // 引擎配置项
@@ -51,7 +51,7 @@ glowflow/
 
 internal/
   config/            // 配置解析与校验
-  runtime/           // 执行器、调度器、消息总线
+    runtime/           // 执行器、调度器、数据总线
   registry/          // 插件注册与工厂
   store/             // 状态存储与持久化接口实现
 ```
@@ -72,6 +72,7 @@ internal/
 ```go
 type FlowDefinition struct {
     ID string `json:"id"`
+    Version string `json:"version"`
     Metadata FlowMetadata `json:"metadata"`
     Endpoints []Endpoint `json:"endpoints"`
     Nodes []NodeDefinition `json:"nodes"`
@@ -92,7 +93,7 @@ type FlowDefinition struct {
 ```go
 type NodeDefinition struct {
     ID string `json:"id"`
-    Type string `json:"type"`
+    Type nodetype.NodeType `json:"type"`
     Name string `json:"name"`
     Layout Layout `json:"layout"`
     ExtParams map[string]any `json:"extparams"`
@@ -122,13 +123,13 @@ type ConnectionDefinition struct {
 
 ### 5.1 注册接口
 
-节点通过工厂函数注册到引擎：
+节点通过工厂函数注册到引擎。节点类型沿用当前项目里的 `nodetype.NodeType`，避免在配置、注册表、节点接口之间反复做字符串转换：
 
 ```go
 type NodeFactory func() Node
 
 type NodeDescriptor struct {
-    Type string
+    Type nodetype.NodeType
     Factory NodeFactory
     DefaultConfig any
 }
@@ -141,7 +142,7 @@ type NodeDescriptor struct {
 ```go
 type Registry interface {
     Register(desc NodeDescriptor) error
-    Get(typeName string) (NodeDescriptor, bool)
+    Get(nodeType nodetype.NodeType) (NodeDescriptor, bool)
     List() []NodeDescriptor
 }
 ```
@@ -158,7 +159,7 @@ type Registry interface {
 
 ### 6.1 编译阶段
 
-引擎接收流程定义后，先进行编译：
+流程定义加载后，需要通过独立编译器完成编译。编译器依赖流程定义和节点注册中心，不把编译逻辑放进 Engine，也不塞进 FlowDefinition 这种纯配置结构：
 
 1. 解析流程 JSON。
 2. 校验节点类型是否存在。
@@ -167,84 +168,84 @@ type Registry interface {
 5. 生成可执行的编译结果。
 
 ```go
+type FlowCompiler interface {
+    Compile(def FlowDefinition, registry Registry) (*CompiledFlow, error)
+}
+```
+
+```go
 type CompiledFlow struct {
     Definition FlowDefinition
     Nodes map[string]CompiledNode
-    Graph map[string][]string
+    Graph map[string]map[string][]CompiledNode
 }
 ```
+
+其中 `Graph` 的第一层 key 是节点 ID，第二层 key 是连接关系类型，例如 `True`、`False`、`case1` 或 `default`。
 
 ### 6.2 执行阶段
 
 执行阶段由调度器驱动：
 
 - 从起始节点开始。
-- 读取消息。
+- 读取输入数据。
 - 调用节点执行逻辑。
-- 根据返回结果选择下一跳节点。
-- 通过消息通道传递数据。
+- 根据 `ExecuteResult.RelationType` 选择下一跳节点。
+- 将 `ExecuteResult.Data` 作为下一跳输入继续传递。
 
 ## 7. 节点接口设计
 
-建议在现有 Node 与 CompiledNode 基础上扩展：
+第一版建议直接沿用当前项目已经存在的 `Node` 与 `CompiledNode`，避免在设计阶段引入另一套并行接口：
 
 ```go
 type Node interface {
-    ID() string
+    Id() string
     Name() string
-    Type() string
+    Type() nodetype.NodeType
+    IsStartNode() bool
     Config() any
     Position() Position
 }
 
-// 运行时节点
-
-type ExecutableNode interface {
+type CompiledNode interface {
     Node
-    Execute(ctx Context, msg Message) (ExecutionResult, error)
-    OnMessage(msg Message) error
+    Execute(ctx Context, data any) (ExecuteResult, error)
+    NextNodes() []CompiledNode
 }
 ```
+
+当前 `NextNodes()` 可以先作为无条件后继集合使用。编译器内部仍应保存基于 `ConnectionDefinition.Type` 的关系图，用于在调度时按 `ExecuteResult.RelationType` 选择下一跳。后续实现时可以把 `NextNodes()` 扩展为按关系类型查询，或者在 `CompiledFlow` 中集中维护关系路由。
 
 ### 7.1 执行结果
 
 ```go
-type ExecutionResult struct {
-    Next []string
-    Message Message
-    Err error
+type ExecuteResult struct {
+    RelationType string
+    Data any
+    Error error
 }
 ```
 
 其中：
 
-- Next 表示应该继续执行的下一跳节点 ID。
-- Message 表示传递给下一跳的消息体。
-- Err 表示执行失败时的错误信息。
+- RelationType 表示当前节点执行后选择的关系类型，和 ConnectionDefinition.Type 对齐。
+- Data 表示传递给下一跳节点的业务数据。
+- Error 表示节点执行中的业务错误。
 
-## 8. 消息传递机制
+## 8. 数据传递机制
 
-消息是节点之间的核心沟通方式，但消息本身不应该绑定具体的发送方或接收方。流程中的节点关系由编译后的拓扑图和连接边决定，消息只负责承载业务数据与上下文。建议把消息抽象为：
+第一版不强行引入独立 Message 对象，先沿用当前代码中的 `data any` 和 `ExecuteResult.Data`：
 
 ```go
-type Message struct {
-    ID string
-    Payload any
-    Meta map[string]any
-    Context map[string]any
-    TraceID string
-    Timestamp time.Time
-}
+Execute(ctx Context, data any) (ExecuteResult, error)
 ```
 
 设计说明：
 
-- 消息不包含 From / To 字段，避免把流程拓扑固化到消息载荷中。
-- 引擎根据编译后的连接关系和节点执行结果决定下一跳。
-- Context 代表“执行上下文”，用于承载当前节点执行时的运行期状态，例如当前流程实例、用户上下文、输入变量等。
-- Meta 代表“附加元信息”，用于承载描述性信息，例如 trace、标签、审计标记、扩展字段等。
-- 如果需要追踪执行链路，使用 TraceID 和 Meta 记录上下文。
-- 便于后续扩展为事件总线、队列或分布式消息传递。
+- 节点不直接指定 From / To，路由由编译后的拓扑和 `RelationType` 决定。
+- `Context` 继续作为运行上下文，承载取消、超时、运行期变量等信息。
+- `data any` 只承载业务输入输出，保持节点接口简单。
+- 如果后续需要 trace、metadata、消息 ID 或分布式队列，再将 `data any` 演进为 Message 对象。
 
 ## 9. 并发与能力控制
 
@@ -271,7 +272,7 @@ type CapabilityConfig struct {
 调度器维护一个工作池：
 
 - 同一节点的并发数受配置控制。
-- 若节点超出并发上限，则消息进入等待队列。
+- 若节点超出并发上限，则待处理数据进入等待队列。
 - 通过信号量或通道实现资源控制。
 
 ## 10. 引擎生命周期
@@ -279,7 +280,8 @@ type CapabilityConfig struct {
 引擎应支持同时管理多个流程定义，并且每个流程定义都可以独立运行、升级、暂停和停止。建议将职责明确划分为：
 
 - Engine：负责加载流程集合、统一调度、管理运行实例与生命周期。
-- FlowDefinition：负责自身的编译、版本管理与热更新。
+- FlowDefinition：保持为纯配置结构，承载流程 ID、版本、节点和连线定义。
+- FlowCompiler：负责把 FlowDefinition 编译为 CompiledFlow。
 
 ```go
 func (e *Engine) Load(defs ...FlowDefinition) error
@@ -287,23 +289,17 @@ func (e *Engine) Run() error
 func (e *Engine) Stop() error
 func (e *Engine) Pause(flowID string) error
 func (e *Engine) Resume(flowID string) error
-```
-
-FlowDefinition 上则提供：
-
-```go
-func (f *FlowDefinition) Compile() (*CompiledFlow, error)
-func (f *FlowDefinition) Reload(next FlowDefinition) error
+func (e *Engine) Reload(def FlowDefinition) error
 ```
 
 ### 10.1 运行流程
 
 1. Load：将一组 FlowDefinition 一次性注册到引擎。
-2. Compile：由 FlowDefinition 自己完成编译，生成可执行拓扑。
+2. Compile：由 FlowCompiler 完成编译，生成可执行拓扑。
 3. Run：引擎启动已加载流程集合的执行。
 4. Stop：停止引擎上所有已启动的流程实例。
 5. Pause/Resume：按 flowID 对指定流程进行暂停或恢复，保持对其他流程的影响最小。
-6. Reload：用新的 FlowDefinition 替换同一个 flowID 的旧版本，但不会影响已经运行中的实例。
+6. Reload：用新的 FlowDefinition 替换同一个 flowID 的旧版本，flowID 从 FlowDefinition.ID 读取，不需要额外参数。
 
 ### 10.2 热更新策略
 
@@ -352,9 +348,9 @@ type FlowVersion struct {
 
 - 从数据库节点读取结果。
 - 根据返回值决定走 True / False / case1 分支。
-- 将消息传递给日志节点做记录。
+- 将执行结果中的数据传递给日志节点做记录。
 
-这类流程非常适合用“节点注册 + 消息路由 + 并发控制”的模型。
+这类流程非常适合用“节点注册 + 关系路由 + 并发控制”的模型。
 
 ## 12. 面向后续扩展的设计
 
@@ -369,12 +365,19 @@ type FlowVersion struct {
 
 ### 12.2 状态存储
 
-第一阶段可使用内存状态；后续可接入：
+状态存储只负责运行处理过程中的状态，不承担流程定义的管理端存储。第一阶段可提供内存实现；后续可接入：
 
 - Redis
 - MySQL
 - MongoDB
 - Kafka / NATS 等消息中间件
+
+当前运行期状态抽象以项目中的 `StateStorage` 为准，主要覆盖：
+
+- InstanceState：流程运行实例状态。
+- NodeState：节点执行状态。
+
+流程定义的新增、删除、版本发布属于管理端能力，不放进 StateStorage。
 
 ### 12.3 分布式执行
 
@@ -382,7 +385,7 @@ type FlowVersion struct {
 
 - 调度器
 - 执行器 worker
-- 消息总线
+- 数据总线或消息总线
 
 ## 13. 推荐的第一版范围
 
@@ -390,7 +393,7 @@ type FlowVersion struct {
 
 - 支持流程定义加载与编译。
 - 支持节点注册。
-- 支持基于消息的节点连线执行。
+- 支持基于 `data any` 和 `ExecuteResult` 的节点连线执行。
 - 支持节点并发配置。
 - 支持简单的分支路由。
 - 先实现内存模式，后续再接入状态存储。
@@ -402,10 +405,10 @@ type FlowVersion struct {
 1. 完成 FlowDefinition 与节点定义结构。
 2. 完成注册中心与节点工厂。
 3. 完成编译器，将配置图转换成执行拓扑。
-4. 完成消息与调度器。
+4. 完成基于 `ExecuteResult.RelationType` 的调度器。
 5. 完成节点并发控制与错误处理。
 6. 完成测试与简单示例。
 
 ## 15. 结论
 
-这套设计将当前仓库中的 Engine、Node、Context 等抽象，扩展为一个“配置驱动、节点注册、消息传递、并发控制”的流程编排引擎。它既适合当前 JSON 配置结构，也能够自然演进到可视化编辑器与分布式执行场景。
+这套设计将当前仓库中的 Engine、Node、CompiledNode、ExecuteResult、Context、StateStorage 等抽象，扩展为一个“配置驱动、节点注册、关系路由、并发控制”的流程编排引擎。它既适合当前 JSON 配置结构，也能够自然演进到可视化编辑器、状态存储与分布式执行场景。
