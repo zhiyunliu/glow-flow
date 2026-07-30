@@ -223,24 +223,25 @@ type ExecutionResult struct {
 
 ## 8. 消息传递机制
 
-消息是节点之间的核心沟通方式。建议把消息抽象为：
+消息是节点之间的核心沟通方式，但消息本身不应该绑定具体的发送方或接收方。流程中的节点关系由编译后的拓扑图和连接边决定，消息只负责承载业务数据与上下文。建议把消息抽象为：
 
 ```go
 type Message struct {
     ID string
-    From string
-    To string
     Payload any
     Meta map[string]any
+    Context map[string]any
+    TraceID string
     Timestamp time.Time
 }
 ```
 
-消息的特点：
+设计说明：
 
-- 允许携带业务数据。
-- 支持附加上下文元信息。
-- 便于后续扩展为事件总线或队列。
+- 消息不包含 From / To 字段，避免把流程拓扑固化到消息载荷中。
+- 引擎根据编译后的连接关系和节点执行结果决定下一跳。
+- 如果需要追踪执行链路，使用 TraceID 和 Meta 记录上下文。
+- 便于后续扩展为事件总线、队列或分布式消息传递。
 
 ## 9. 并发与能力控制
 
