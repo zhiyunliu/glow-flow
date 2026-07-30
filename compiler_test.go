@@ -1,0 +1,93 @@
+package glowflow
+
+import (
+	"testing"
+
+	"github.com/zhiyunliu/glow-flow/nodetype"
+)
+
+type testNode struct {
+	id      string
+	name    string
+	nodeTyp nodetype.NodeType
+	start   bool
+	config  any
+	pos     Position
+	result  ExecuteResult
+}
+
+func (n *testNode) Id() string                                           { return n.id }
+func (n *testNode) Name() string                                         { return n.name }
+func (n *testNode) Type() nodetype.NodeType                              { return n.nodeTyp }
+func (n *testNode) IsStartNode() bool                                    { return n.start }
+func (n *testNode) Config() any                                          { return n.config }
+func (n *testNode) Position() Position                                   { return n.pos }
+func (n *testNode) Execute(ctx Context, data any) (ExecuteResult, error) { return n.result, nil }
+func (n *testNode) NextNodes() []CompiledNode                            { return nil }
+
+func TestFlowCompilerBuildsRelationGraph(t *testing.T) {
+	registry := NewRegistry()
+	err := registry.Register(NodeDescriptor{
+		Type: nodetype.StartNode,
+		Factory: func(def NodeDefinition) (CompiledNode, error) {
+			return &testNode{id: def.ID, name: def.Name, nodeTyp: def.Type, start: true, config: def.ExtParams}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("register start node: %v", err)
+	}
+	err = registry.Register(NodeDescriptor{
+		Type: nodetype.TaskNode,
+		Factory: func(def NodeDefinition) (CompiledNode, error) {
+			return &testNode{id: def.ID, name: def.Name, nodeTyp: def.Type, config: def.ExtParams}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("register task node: %v", err)
+	}
+
+	compiled, err := NewFlowCompiler().Compile(FlowDefinition{
+		ID:      "flow-a",
+		Version: "v1",
+		Nodes: []NodeDefinition{
+			{ID: "start", Name: "start", Type: nodetype.StartNode},
+			{ID: "true-node", Name: "true", Type: nodetype.TaskNode},
+			{ID: "false-node", Name: "false", Type: nodetype.TaskNode},
+		},
+		Connections: []ConnectionDefinition{
+			{FromID: "start", ToID: "true-node", Type: "True"},
+			{FromID: "start", ToID: "false-node", Type: "False"},
+		},
+	}, registry)
+	if err != nil {
+		t.Fatalf("compile flow: %v", err)
+	}
+
+	if compiled.Definition.ID != "flow-a" {
+		t.Fatalf("compiled flow ID = %q, want %q", compiled.Definition.ID, "flow-a")
+	}
+	if len(compiled.StartNodes) != 1 || compiled.StartNodes[0].Id() != "start" {
+		t.Fatalf("start nodes = %#v, want only start", compiled.StartNodes)
+	}
+	trueNodes := compiled.NextNodes("start", "True")
+	if len(trueNodes) != 1 || trueNodes[0].Id() != "true-node" {
+		t.Fatalf("True next nodes = %#v, want true-node", trueNodes)
+	}
+	falseNodes := compiled.NextNodes("start", "False")
+	if len(falseNodes) != 1 || falseNodes[0].Id() != "false-node" {
+		t.Fatalf("False next nodes = %#v, want false-node", falseNodes)
+	}
+}
+
+func TestFlowCompilerRejectsUnknownNodeType(t *testing.T) {
+	_, err := NewFlowCompiler().Compile(FlowDefinition{
+		ID:      "flow-a",
+		Version: "v1",
+		Nodes: []NodeDefinition{
+			{ID: "start", Name: "start", Type: nodetype.StartNode},
+		},
+	}, NewRegistry())
+	if err == nil {
+		t.Fatal("compile error is nil, want unknown node type error")
+	}
+}

@@ -3,6 +3,9 @@ package glowflow
 type options struct {
 	dataRepository DataRepository
 	stateStorage   StateStorage
+	registry       Registry
+	compiler       FlowCompiler
+	dispatcher     Dispatcher
 }
 
 // Option is a function that configures the engine.
@@ -19,5 +22,23 @@ func WithDataRepository(repo DataRepository) Option {
 func WithStateStorage(storage StateStorage) Option {
 	return func(o *options) {
 		o.stateStorage = storage
+	}
+}
+
+func WithRegistry(registry Registry) Option {
+	return func(o *options) {
+		o.registry = registry
+	}
+}
+
+func WithFlowCompiler(compiler FlowCompiler) Option {
+	return func(o *options) {
+		o.compiler = compiler
+	}
+}
+
+func WithDispatcher(dispatcher Dispatcher) Option {
+	return func(o *options) {
+		o.dispatcher = dispatcher
 	}
 }
