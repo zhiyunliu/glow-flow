@@ -71,6 +71,7 @@ internal/
 
 ```go
 type FlowDefinition struct {
+    ID string `json:"id"`
     Metadata FlowMetadata `json:"metadata"`
     Endpoints []Endpoint `json:"endpoints"`
     Nodes []NodeDefinition `json:"nodes"`
@@ -240,6 +241,8 @@ type Message struct {
 
 - 消息不包含 From / To 字段，避免把流程拓扑固化到消息载荷中。
 - 引擎根据编译后的连接关系和节点执行结果决定下一跳。
+- Context 代表“执行上下文”，用于承载当前节点执行时的运行期状态，例如当前流程实例、用户上下文、输入变量等。
+- Meta 代表“附加元信息”，用于承载描述性信息，例如 trace、标签、审计标记、扩展字段等。
 - 如果需要追踪执行链路，使用 TraceID 和 Meta 记录上下文。
 - 便于后续扩展为事件总线、队列或分布式消息传递。
 
@@ -273,24 +276,51 @@ type CapabilityConfig struct {
 
 ## 10. 引擎生命周期
 
-引擎应支持以下生命周期：
+引擎应支持同时管理多个流程定义，并且每个流程定义都可以独立运行、升级、暂停和停止。建议将引擎的职责拆成“管理层”和“实例层”两部分：
 
 ```go
 func (e *Engine) Load(def FlowDefinition) error
-func (e *Engine) Compile() error
-func (e *Engine) Run() error
-func (e *Engine) Stop() error
-func (e *Engine) Pause() error
-func (e *Engine) Resume() error
+func (e *Engine) Compile(flowID string) error
+func (e *Engine) Run(flowID string) error
+func (e *Engine) Stop(flowID string) error
+func (e *Engine) Pause(flowID string) error
+func (e *Engine) Resume(flowID string) error
+func (e *Engine) Reload(flowID string, def FlowDefinition) error
 ```
 
 ### 10.1 运行流程
 
-1. Load：加载流程定义。
-2. Compile：生成编译结果。
-3. Run：启动执行。
-4. Stop：停止执行。
+1. Load：将流程定义注册到引擎，按 FlowDefinition.ID 建立唯一引用。
+2. Compile：为指定 flowID 生成编译结果。
+3. Run：启动指定流程实例的执行。
+4. Stop：停止指定流程实例。
 5. Pause/Resume：支持暂停恢复。
+6. Reload：以新版本 FlowDefinition 替换旧版本，但不会影响已经运行中的实例。
+
+### 10.2 热更新策略
+
+热更新的目标是“新配置生效，旧实例继续运行”。建议采用以下规则：
+
+- 以 FlowDefinition.ID 作为流程唯一标识。
+- 同一个 flowID 的新版本配置会被视为新的“定义版本”。
+- 已经启动的运行实例继续使用旧版本编译结果。
+- 新的调度请求使用最新版本定义。
+- 需要通过版本号或 revision 字段来区分定义版本，避免冲突。
+
+```go
+type FlowVersion struct {
+    FlowID string
+    Version string
+    Definition FlowDefinition
+    Compiled *CompiledFlow
+}
+```
+
+这样做的好处是：
+
+- 旧流程实例可以稳定结束。
+- 新流程请求可以立即使用最新版本。
+- 运行时不需要中断已有任务。
 
 ## 11. 配置与运行场景
 
