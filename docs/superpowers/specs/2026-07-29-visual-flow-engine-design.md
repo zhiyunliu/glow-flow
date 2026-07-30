@@ -285,8 +285,8 @@ type CapabilityConfig struct {
 func (e *Engine) Load(defs ...FlowDefinition) error
 func (e *Engine) Run() error
 func (e *Engine) Stop() error
-func (e *Engine) Pause() error
-func (e *Engine) Resume() error
+func (e *Engine) Pause(flowID string) error
+func (e *Engine) Resume(flowID string) error
 ```
 
 FlowDefinition 上则提供：
@@ -302,7 +302,7 @@ func (f *FlowDefinition) Reload(next FlowDefinition) error
 2. Compile：由 FlowDefinition 自己完成编译，生成可执行拓扑。
 3. Run：引擎启动已加载流程集合的执行。
 4. Stop：停止引擎上所有已启动的流程实例。
-5. Pause/Resume：支持暂停恢复。
+5. Pause/Resume：按 flowID 对指定流程进行暂停或恢复，保持对其他流程的影响最小。
 6. Reload：用新的 FlowDefinition 替换同一个 flowID 的旧版本，但不会影响已经运行中的实例。
 
 ### 10.2 热更新策略
