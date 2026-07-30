@@ -3,13 +3,13 @@ package glowflow
 import (
 	"context"
 	"fmt"
-	"sync"
+
+	cmap "github.com/orcaman/concurrent-map/v2"
 )
 
 type Engine struct {
 	options *options
-	mu      sync.RWMutex
-	flows   map[string]*flowSeries
+	flows   cmap.ConcurrentMap[string, *flowSeries]
 }
 
 type flowSeries struct {
@@ -27,7 +27,7 @@ type flowRuntime struct {
 func NewEngine(opts ...Option) *Engine {
 	engine := &Engine{
 		options: &options{},
-		flows:   make(map[string]*flowSeries),
+		flows:   cmap.New[*flowSeries](),
 	}
 	for _, opt := range opts {
 		opt(engine.options)
@@ -45,8 +45,6 @@ func NewEngine(opts ...Option) *Engine {
 }
 
 func (e *Engine) Load(defs ...FlowDefinition) error {
-	e.mu.Lock()
-	defer e.mu.Unlock()
 	for _, def := range defs {
 		if err := e.loadLocked(def); err != nil {
 			return err
@@ -60,36 +58,20 @@ func (e *Engine) Run() error {
 	return nil
 }
 
-func (e *Engine) Dispatch(flowID string, data any) error {
-	e.mu.RLock()
-	series, ok := e.flows[flowID]
+func (e *Engine) Dispatch(flowID string, data any) (string, error) {
+	series, ok := e.flows.Get(flowID)
 	if !ok {
-		e.mu.RUnlock()
-		return fmt.Errorf("flow not loaded: %s", flowID)
-	}
-	version := series.latestVersion
-	e.mu.RUnlock()
-	return e.DispatchVersion(flowID, version, data)
-}
-
-func (e *Engine) DispatchVersion(flowID string, version string, data any) error {
-	e.mu.RLock()
-	series, ok := e.flows[flowID]
-	if !ok {
-		e.mu.RUnlock()
-		return fmt.Errorf("flow not loaded: %s", flowID)
+		return "", fmt.Errorf("flow not loaded: %s", flowID)
 	}
 	if series.paused {
-		e.mu.RUnlock()
-		return fmt.Errorf("flow paused: %s", flowID)
+		return "", fmt.Errorf("flow paused: %s", flowID)
 	}
+	version := series.latestVersion
 	flow, ok := series.versions[version]
 	if !ok {
-		e.mu.RUnlock()
-		return fmt.Errorf("flow version not loaded: %s@%s", flowID, version)
+		return "", fmt.Errorf("flow version not loaded: %s@%s", flowID, version)
 	}
 	compiled := flow.compiled
-	e.mu.RUnlock()
 
 	return e.options.dispatcher.Dispatch(NewContext(context.Background()), compiled, data)
 }
@@ -100,9 +82,8 @@ func (e *Engine) Stop() error {
 }
 
 func (e *Engine) Pause(flowID string) error {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	flow, ok := e.flows[flowID]
+
+	flow, ok := e.flows.Get(flowID)
 	if !ok {
 		return fmt.Errorf("flow not loaded: %s", flowID)
 	}
@@ -111,9 +92,7 @@ func (e *Engine) Pause(flowID string) error {
 }
 
 func (e *Engine) Resume(flowID string) error {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	flow, ok := e.flows[flowID]
+	flow, ok := e.flows.Get(flowID)
 	if !ok {
 		return fmt.Errorf("flow not loaded: %s", flowID)
 	}
@@ -122,8 +101,6 @@ func (e *Engine) Resume(flowID string) error {
 }
 
 func (e *Engine) Reload(def FlowDefinition) error {
-	e.mu.Lock()
-	defer e.mu.Unlock()
 	return e.loadLocked(def)
 }
 
@@ -138,10 +115,10 @@ func (e *Engine) loadLocked(def FlowDefinition) error {
 	if err != nil {
 		return err
 	}
-	series, ok := e.flows[def.ID]
+	series, ok := e.flows.Get(def.ID)
 	if !ok {
 		series = &flowSeries{versions: make(map[string]*flowRuntime)}
-		e.flows[def.ID] = series
+		e.flows.Set(def.ID, series)
 	}
 	series.versions[def.Version] = &flowRuntime{definition: def, compiled: compiled}
 	series.latestVersion = def.Version

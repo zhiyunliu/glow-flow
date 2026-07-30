@@ -38,9 +38,12 @@ func TestEngineDispatchesLoadedFlowWithData(t *testing.T) {
 		t.Fatalf("executed after run = %#v, want no dispatch", executed)
 	}
 
-	err = engine.Dispatch("flow-a", "payload-a")
+	instanceID, err := engine.Dispatch("flow-a", "payload-a")
 	if err != nil {
 		t.Fatalf("dispatch flow-a: %v", err)
+	}
+	if instanceID == "" {
+		t.Fatal("dispatch flow-a instanceID is empty")
 	}
 	if executed["start-a"] != 1 || executed["start-b"] != 0 {
 		t.Fatalf("executed = %#v, want only flow-a", executed)
@@ -74,10 +77,10 @@ func TestEnginePauseResumeFlow(t *testing.T) {
 	if err := engine.Pause("flow-a"); err != nil {
 		t.Fatalf("pause flow-a: %v", err)
 	}
-	if err := engine.Dispatch("flow-a", nil); err == nil {
+	if _, err := engine.Dispatch("flow-a", nil); err == nil {
 		t.Fatal("dispatch paused flow error is nil, want error")
 	}
-	if err := engine.Dispatch("flow-b", nil); err != nil {
+	if _, err := engine.Dispatch("flow-b", nil); err != nil {
 		t.Fatalf("dispatch flow-b: %v", err)
 	}
 	if executed["start-a"] != 0 || executed["start-b"] != 1 {
@@ -86,7 +89,7 @@ func TestEnginePauseResumeFlow(t *testing.T) {
 	if err := engine.Resume("flow-a"); err != nil {
 		t.Fatalf("resume flow-a: %v", err)
 	}
-	if err := engine.Dispatch("flow-a", nil); err != nil {
+	if _, err := engine.Dispatch("flow-a", nil); err != nil {
 		t.Fatalf("dispatch flow-a after resume: %v", err)
 	}
 	if executed["start-a"] != 1 || executed["start-b"] != 1 {
@@ -116,18 +119,15 @@ func TestEngineKeepsVersionsAndDispatchesLatestByFlowID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reload flow: %v", err)
 	}
-	err = engine.Dispatch("flow-a", nil)
+	instanceID, err := engine.Dispatch("flow-a", nil)
 	if err != nil {
 		t.Fatalf("dispatch flow-a: %v", err)
 	}
+	if instanceID == "" {
+		t.Fatal("dispatch flow-a instanceID is empty")
+	}
 	if executed["start-v1"] != 0 || executed["start-v2"] != 1 {
 		t.Fatalf("executed after dispatch latest = %#v, want only v2", executed)
-	}
-	if err := engine.DispatchVersion("flow-a", "v1", nil); err != nil {
-		t.Fatalf("dispatch flow-a v1: %v", err)
-	}
-	if executed["start-v1"] != 1 || executed["start-v2"] != 1 {
-		t.Fatalf("executed after version dispatch = %#v, want v1 retained", executed)
 	}
 }
 

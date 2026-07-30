@@ -57,9 +57,12 @@ func TestDispatcherRoutesByRelationType(t *testing.T) {
 		StartNodes: []CompiledNode{start},
 	}
 
-	err := NewDispatcher().Dispatch(NewContext(context.Background()), flow, "input")
+	instanceID, err := NewDispatcher().Dispatch(NewContext(context.Background()), flow, "input")
 	if err != nil {
 		t.Fatalf("dispatch: %v", err)
+	}
+	if instanceID == "" {
+		t.Fatal("dispatch instanceID is empty")
 	}
 
 	if len(start.inputs) != 1 || start.inputs[0] != "input" {
@@ -98,11 +101,36 @@ func TestDispatcherUsesDefaultRelationFallback(t *testing.T) {
 		StartNodes: []CompiledNode{start},
 	}
 
-	err := NewDispatcher().Dispatch(NewContext(context.Background()), flow, "input")
+	instanceID, err := NewDispatcher().Dispatch(NewContext(context.Background()), flow, "input")
 	if err != nil {
 		t.Fatalf("dispatch: %v", err)
 	}
+	if instanceID == "" {
+		t.Fatal("dispatch instanceID is empty")
+	}
 	if len(defaultNode.inputs) != 1 || defaultNode.inputs[0] != 42 {
 		t.Fatalf("default node inputs = %#v, want 42", defaultNode.inputs)
+	}
+}
+
+func TestDispatcherReturnsDifferentInstanceIDPerDispatch(t *testing.T) {
+	start := &recordingNode{id: "start", name: "start", nodeType: nodetype.StartNode, start: true}
+	flow := &CompiledFlow{StartNodes: []CompiledNode{start}}
+	dispatcher := NewDispatcher()
+
+	firstID, err := dispatcher.Dispatch(NewContext(context.Background()), flow, "first")
+	if err != nil {
+		t.Fatalf("dispatch first: %v", err)
+	}
+	secondID, err := dispatcher.Dispatch(NewContext(context.Background()), flow, "second")
+	if err != nil {
+		t.Fatalf("dispatch second: %v", err)
+	}
+
+	if firstID == "" || secondID == "" {
+		t.Fatalf("instanceIDs = %q, %q, want non-empty", firstID, secondID)
+	}
+	if firstID == secondID {
+		t.Fatalf("instanceIDs = %q and %q, want different", firstID, secondID)
 	}
 }

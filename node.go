@@ -27,5 +27,4 @@ type Node interface {
 type CompiledNode interface {
 	Node
 	Execute(ctx Context, data any) (ExecuteResult, error)
-	NextNodes() []CompiledNode
 }
