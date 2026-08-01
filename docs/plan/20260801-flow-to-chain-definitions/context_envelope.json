@@ -1,0 +1,198 @@
+{
+  "context_envelope": {
+    "meta": {
+      "plan_id": "20260801-flow-to-chain-definitions",
+      "created_at": "2026-08-01T00:00:00+08:00",
+      "last_updated": "2026-08-01T00:00:00+08:00",
+      "version": "1"
+    },
+    "tech_stack": [
+      {
+        "name": "Go",
+        "version": "module default",
+        "usage_context": "Library package github.com/zhiyunliu/glow-flow",
+        "config_files": ["go.mod"]
+      }
+    ],
+    "conventions": [
+      "Package name remains glowflow; public API uses exported Go structs and interfaces.",
+      "Definition structs in define.go carry JSON tags and are consumed by compiler/engine.",
+      "Runtime flow terms are pervasive and should stay unless tied to exported definition object names.",
+      "Tests are package-local Go tests using direct struct literals."
+    ],
+    "constraints": {
+      "hard": [
+        "Do not implement during planning phase.",
+        "Use apply_patch for later implementation edits.",
+        "Do not revert unrelated user changes.",
+        "Do not rename package glowflow.",
+        "Do not rename runtime symbols unless directly required by definition object type references."
+      ],
+      "soft": [
+        "Keep migration mechanical and minimal.",
+        "Prefer compilation/search validation over broad refactors."
+      ],
+      "compatibility": [
+        "FlowMetadata and FlowDefinition are exported; rename is a breaking API change.",
+        "JSON field names should remain stable unless explicit requirements change."
+      ]
+    },
+    "architecture_snapshot": {
+      "key_dirs": [
+        ".",
+        "defaults",
+        "docs/superpowers/specs"
+      ],
+      "patterns": [
+        "define.go owns public configuration/definition structs.",
+        "compiler.go compiles definition inputs into CompiledFlow runtime topology.",
+        "engine.go stores definitions and compiled runtime by flow ID/version.",
+        "tests instantiate definition structs directly to exercise compiler and engine behavior."
+      ],
+      "key_components": [
+        {
+          "name": "Definition model",
+          "location": "define.go",
+          "responsibility": [
+            "Declare Layout, FlowMetadata, FlowDefinition, EndpointDefinition, NodeDefinition, ConnectionDefinition.",
+            "Provide JSON shape for chain/flow configuration inputs."
+          ]
+        },
+        {
+          "name": "FlowCompiler",
+          "location": "compiler.go",
+          "responsibility": [
+            "Accept definition input and Registry.",
+            "Resolve NodeDefinition.Type to node factories.",
+            "Produce CompiledFlow graph and start nodes."
+          ]
+        },
+        {
+          "name": "Engine load lifecycle",
+          "location": "engine.go",
+          "responsibility": [
+            "Load and Reload definition inputs.",
+            "Store compiled runtime per flow ID/version.",
+            "Dispatch compiled runtime by flow ID."
+          ]
+        }
+      ]
+    },
+    "research_digest": {
+      "relevant_files": [
+        {
+          "path": "define.go",
+          "purpose": [
+            "Primary owner of FlowMetadata and FlowDefinition.",
+            "Expected rename source: FlowMetadata -> ChainMetadata; FlowDefinition -> ChainDefinition."
+          ],
+          "confidence": 0.98
+        },
+        {
+          "path": "compiler.go",
+          "purpose": [
+            "FlowCompiler.Compile currently accepts FlowDefinition.",
+            "CompiledFlow.Definition currently stores FlowDefinition."
+          ],
+          "confidence": 0.95
+        },
+        {
+          "path": "engine.go",
+          "purpose": [
+            "Engine Load/Reload/loadLocked currently accept FlowDefinition.",
+            "flowRuntime.definition currently stores FlowDefinition."
+          ],
+          "confidence": 0.95
+        },
+        {
+          "path": "compiler_test.go",
+          "purpose": [
+            "Compiler tests instantiate FlowDefinition.",
+            "Should compile against ChainDefinition after API rename."
+          ],
+          "confidence": 0.9
+        },
+        {
+          "path": "engine_test.go",
+          "purpose": [
+            "Engine tests instantiate FlowDefinition for Load and Reload.",
+            "Should compile against ChainDefinition after API rename."
+          ],
+          "confidence": 0.9
+        },
+        {
+          "path": "docs/superpowers/specs/2026-07-29-visual-flow-engine-design.md",
+          "purpose": [
+            "Design spec includes exported type snippets and API signatures using FlowDefinition/FlowMetadata.",
+            "Current docs should align with renamed definition object names."
+          ],
+          "confidence": 0.85
+        }
+      ],
+      "patterns_found": [
+        {
+          "name": "Definition-to-runtime compile boundary",
+          "category": "architecture",
+          "confidence": 0.9,
+          "example_location": ["compiler.go", "engine.go"]
+        },
+        {
+          "name": "Runtime flow terminology distinct from definition object naming",
+          "category": "naming-boundary",
+          "confidence": 0.88,
+          "example_location": ["compiler.go", "dispatcher.go", "engine.go"]
+        }
+      ],
+      "gotchas": [
+        {
+          "text": "Search for Flow* is noisy: FlowCompiler, CompiledFlow, flowID, state FlowID are runtime/domain terms, not target objects.",
+          "confidence": 0.92
+        },
+        {
+          "text": "Archived docs/plan/20260801-remove-nodetype-nodetype mention FlowDefinition historically; do not edit unless policy requires archive churn.",
+          "confidence": 0.8
+        },
+        {
+          "text": "docs/superpowers/specs file is a current design spec and contains snippets that should likely migrate.",
+          "confidence": 0.82
+        }
+      ]
+    },
+    "prior_decisions": [
+      {
+        "decision": "Rename only exported definition object types FlowMetadata and FlowDefinition.",
+        "rationale": [
+          "User asked for Flow* objects in define.go because package name already ends with flow.",
+          "Other Flow names represent compiler/runtime flow concepts, not definition objects."
+        ],
+        "confidence": 0.88
+      },
+      {
+        "decision": "Keep JSON tags unchanged.",
+        "rationale": [
+          "Request concerns Go object names, not serialized schema.",
+          "Changing JSON would expand compatibility risk without explicit requirement."
+        ],
+        "confidence": 0.86
+      },
+      {
+        "decision": "Keep NodeDefinition.Type as string and out of scope.",
+        "rationale": [
+          "Prior nodetype migration already completed.",
+          "Current rename objective is independent of node type representation."
+        ],
+        "confidence": 0.95
+      }
+    ],
+    "reuse_notes": [
+      {
+        "path": "/memories/repo/d_default_node_factory_nil.md",
+        "trust": "high"
+      },
+      {
+        "path": "docs/plan/20260801-remove-nodetype-nodetype/context_envelope.json",
+        "trust": "low"
+      }
+    ]
+  }
+}

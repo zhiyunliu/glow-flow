@@ -1,0 +1,155 @@
+plan_id: 20260801-flow-to-chain-definitions
+objective: Rename Flow* definition objects to Chain* because package name already ends with flow
+created_at: "2026-08-01T00:00:00+08:00"
+created_by: gem-planner
+status: pending
+tldr: |
+  Rename exported definition-layer objects from FlowMetadata/FlowDefinition to ChainMetadata/ChainDefinition.
+  Keep runtime flow terminology and package name unchanged. Validate with repository tests and diagnostics.
+plan_metrics:
+  wave_1_task_count: 1
+  total_dependencies: 2
+  risk_score: medium
+quality_warnings:
+  - Public API rename is breaking for downstream users; keep scope explicit and mechanical.
+assumptions:
+  - Expected symbol rename: FlowMetadata -> ChainMetadata.
+  - Expected symbol rename: FlowDefinition -> ChainDefinition.
+  - ChainDefinition.Metadata should use ChainMetadata while JSON tags remain unchanged.
+  - Runtime names such as FlowCompiler, CompiledFlow, flowID, flowRuntime, and package glowflow remain unchanged.
+  - Existing JSON schema keys remain unchanged unless execution discovers explicit tests requiring otherwise.
+tasks:
+  - id: T1-api-definition-rename
+    title: Rename public definition symbols
+    description: Update exported definition object names and direct code contracts that consume definition inputs.
+    wave: 1
+    agent: gem-implementer
+    status: pending
+    covers:
+      - AC1: Public definition objects use Chain* names instead of Flow* names.
+      - AC2: Runtime flow naming stays unchanged outside direct type references.
+    dependencies: []
+    conflicts_with: []
+    context_files:
+      - path: define.go
+        description: Owns FlowMetadata and FlowDefinition definitions.
+      - path: compiler.go
+        description: FlowCompiler consumes FlowDefinition and stores it in CompiledFlow.Definition.
+      - path: engine.go
+        description: Engine Load/Reload/loadLocked and flowRuntime store FlowDefinition.
+      - path: options.go
+        description: Option wiring references FlowCompiler only; verify no definition rename needed.
+    flags:
+      flaky: false
+      retries_used: 0
+      requires_design_validation: false
+    acceptance_criteria:
+      - FlowMetadata no longer exists in production Go code.
+      - FlowDefinition no longer exists in production Go code.
+      - ChainMetadata exists with the same fields and JSON tags as old FlowMetadata.
+      - ChainDefinition exists with the same fields and JSON tags as old FlowDefinition, except Metadata type is ChainMetadata.
+      - Engine and compiler public methods that accept flow definitions now accept ChainDefinition.
+      - Runtime-oriented symbols FlowCompiler, CompiledFlow, DefaultRelationType, flowID, and package glowflow are not renamed.
+    success_criteria:
+      - rg "\bFlowMetadata\b|\bFlowDefinition\b" --glob "*.go" returns no matches after code/test migration.
+      - go test ./... passes after all waves.
+    tech_stack:
+      - Go
+    test_coverage: Existing compiler and engine tests should compile against renamed public API after T2.
+    diag: null
+    handoff:
+      do_not_reinvestigate:
+        - NodeDefinition.Type is already string and unrelated to this rename.
+        - nodetype package was removed in prior work.
+      required_test_first: None required; this is a mechanical public API rename verified by compilation.
+      target_files:
+        - define.go
+        - compiler.go
+        - engine.go
+      minimal_change: Rename only direct definition-layer type names and signatures required for compilation.
+      acceptance_checks:
+        - go test ./...
+        - get_errors on touched Go files if available.
+  - id: T2-tests-and-examples-rename
+    title: Align tests and Go examples
+    description: Update repository tests and Go snippets that instantiate the renamed definition objects.
+    wave: 2
+    agent: gem-implementer
+    status: pending
+    covers:
+      - AC3: Tests and examples use ChainDefinition and ChainMetadata consistently.
+    dependencies:
+      - T1-api-definition-rename
+    conflicts_with: []
+    context_files:
+      - path: compiler_test.go
+        description: Instantiates FlowDefinition in compiler tests.
+      - path: engine_test.go
+        description: Instantiates FlowDefinition for Load and Reload tests.
+      - path: define_test.go
+        description: NodeDefinition-only test; verify no unnecessary change.
+      - path: docs/superpowers/specs/2026-07-29-visual-flow-engine-design.md
+        description: Design spec contains Go snippets using FlowDefinition/FlowMetadata.
+    flags:
+      flaky: false
+      retries_used: 0
+      requires_design_validation: false
+    acceptance_criteria:
+      - Test code instantiates ChainDefinition instead of FlowDefinition.
+      - Documentation Go snippets for definition objects use ChainDefinition and ChainMetadata.
+      - Unrelated prose using flow as runtime domain language is preserved where not naming exported definition objects.
+    success_criteria:
+      - go test ./... passes after all waves.
+      - rg "\bFlowMetadata\b|\bFlowDefinition\b" returns only intentional historical plan references, if any.
+    tech_stack:
+      - Go
+      - Markdown
+    test_coverage: Existing compiler and engine tests cover construction, compile, load, reload, and dispatch paths.
+    diag: null
+    handoff:
+      do_not_reinvestigate:
+        - Runtime names and error messages using flow are out of scope unless they mention removed exported type names.
+      required_test_first: Run go test ./... after T1/T2 edits compile.
+      target_files:
+        - compiler_test.go
+        - engine_test.go
+        - docs/superpowers/specs/2026-07-29-visual-flow-engine-design.md
+      minimal_change: Replace exported definition object names in tests/snippets without broad wording rewrites.
+      acceptance_checks:
+        - go test ./...
+        - rg "\bFlowMetadata\b|\bFlowDefinition\b"
+  - id: T3-validation-review
+    title: Validate rename boundary
+    description: Run final checks and review for missed exported names or accidental runtime renames.
+    wave: 3
+    agent: gem-reviewer
+    status: pending
+    covers:
+      - AC4: Repository validates and rename boundary is respected.
+    dependencies:
+      - T2-tests-and-examples-rename
+    conflicts_with: []
+    context_files:
+      - path: define.go
+        description: Final source of renamed public definition objects.
+      - path: compiler.go
+        description: Final compiler contract after rename.
+      - path: engine.go
+        description: Final engine load/reload contract after rename.
+      - path: docs/superpowers/specs/2026-07-29-visual-flow-engine-design.md
+        description: Final design spec examples after rename.
+    flags:
+      flaky: false
+      retries_used: 0
+      requires_design_validation: false
+    acceptance_criteria:
+      - go test ./... exits 0.
+      - go list ./... exits 0.
+      - Diagnostics report no relevant syntax/type errors in touched files.
+      - Search confirms FlowMetadata and FlowDefinition do not remain in active code or current docs except archived plans.
+      - Search confirms ChainMetadata and ChainDefinition exist in active code and tests/docs.
+    success_criteria:
+      - Final review reports no accidental rename of FlowCompiler, CompiledFlow, flowID, or package glowflow.
+    requires_review: true
+    review_depth: lightweight
+    review_security_sensitive: false

@@ -7,7 +7,7 @@ import (
 const DefaultRelationType = "default"
 
 type FlowCompiler interface {
-	Compile(def FlowDefinition, registry Registry) (*CompiledFlow, error)
+	Compile(def ChainDefinition, registry Registry) (*CompiledFlow, error)
 }
 
 type flowCompiler struct{}
@@ -17,7 +17,7 @@ func NewFlowCompiler() FlowCompiler {
 }
 
 type CompiledFlow struct {
-	Definition FlowDefinition
+	Definition ChainDefinition
 	Nodes      map[string]CompiledNode
 	Graph      map[string]map[string][]CompiledNode
 	StartNodes []CompiledNode
@@ -38,7 +38,7 @@ func (f *CompiledFlow) NextNodes(nodeID string, relationType string) []CompiledN
 	return append([]CompiledNode(nil), nodes...)
 }
 
-func (c *flowCompiler) Compile(def FlowDefinition, registry Registry) (*CompiledFlow, error) {
+func (c *flowCompiler) Compile(def ChainDefinition, registry Registry) (*CompiledFlow, error) {
 	if registry == nil {
 		return nil, fmt.Errorf("registry is nil")
 	}

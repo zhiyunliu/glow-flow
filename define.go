@@ -9,7 +9,7 @@ type Layout struct {
 	W    int    `json:"W,omitempty"`
 }
 
-type FlowMetadata struct {
+type ChainMetadata struct {
 	ID        string         `json:"id"`
 	Name      string         `json:"name"`
 	Root      bool           `json:"root"`
@@ -24,10 +24,10 @@ type EndpointDefinition struct {
 	ExtParams map[string]any `json:"extparams,omitempty"`
 }
 
-type FlowDefinition struct {
+type ChainDefinition struct {
 	ID          string                 `json:"id"`
 	Version     string                 `json:"version"`
-	Metadata    FlowMetadata           `json:"metadata"`
+	Metadata    ChainMetadata          `json:"metadata"`
 	Endpoints   []EndpointDefinition   `json:"endpoints"`
 	Nodes       []NodeDefinition       `json:"nodes"`
 	Connections []ConnectionDefinition `json:"connections"`
@@ -45,4 +45,5 @@ type ConnectionDefinition struct {
 	FromID string `json:"from_id"`
 	ToID   string `json:"to_id"`
 	Type   string `json:"type"`
+	Remark string `json:"remark,omitempty"`
 }

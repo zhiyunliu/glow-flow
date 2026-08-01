@@ -22,8 +22,8 @@ func TestEngineDispatchesLoadedFlowWithData(t *testing.T) {
 
 	engine := NewEngine(WithRegistry(registry))
 	err = engine.Load(
-		FlowDefinition{ID: "flow-a", Version: "v1", Nodes: []NodeDefinition{{ID: "start-a", Type: "start"}}},
-		FlowDefinition{ID: "flow-b", Version: "v1", Nodes: []NodeDefinition{{ID: "start-b", Type: "start"}}},
+		ChainDefinition{ID: "flow-a", Version: "v1", Nodes: []NodeDefinition{{ID: "start-a", Type: "start"}}},
+		ChainDefinition{ID: "flow-b", Version: "v1", Nodes: []NodeDefinition{{ID: "start-b", Type: "start"}}},
 	)
 	if err != nil {
 		t.Fatalf("load flows: %v", err)
@@ -90,8 +90,8 @@ func TestEnginePauseResumeFlow(t *testing.T) {
 
 	engine := NewEngine(WithRegistry(registry))
 	err = engine.Load(
-		FlowDefinition{ID: "flow-a", Version: "v1", Nodes: []NodeDefinition{{ID: "start-a", Type: "start"}}},
-		FlowDefinition{ID: "flow-b", Version: "v1", Nodes: []NodeDefinition{{ID: "start-b", Type: "start"}}},
+		ChainDefinition{ID: "flow-a", Version: "v1", Nodes: []NodeDefinition{{ID: "start-a", Type: "start"}}},
+		ChainDefinition{ID: "flow-b", Version: "v1", Nodes: []NodeDefinition{{ID: "start-b", Type: "start"}}},
 	)
 	if err != nil {
 		t.Fatalf("load flows: %v", err)
@@ -133,11 +133,11 @@ func TestEngineKeepsVersionsAndDispatchesLatestByFlowID(t *testing.T) {
 	}
 
 	engine := NewEngine(WithRegistry(registry))
-	err = engine.Load(FlowDefinition{ID: "flow-a", Version: "v1", Nodes: []NodeDefinition{{ID: "start-v1", Type: "start"}}})
+	err = engine.Load(ChainDefinition{ID: "flow-a", Version: "v1", Nodes: []NodeDefinition{{ID: "start-v1", Type: "start"}}})
 	if err != nil {
 		t.Fatalf("load flow: %v", err)
 	}
-	err = engine.Reload(FlowDefinition{ID: "flow-a", Version: "v2", Nodes: []NodeDefinition{{ID: "start-v2", Type: "start"}}})
+	err = engine.Reload(ChainDefinition{ID: "flow-a", Version: "v2", Nodes: []NodeDefinition{{ID: "start-v2", Type: "start"}}})
 	if err != nil {
 		t.Fatalf("reload flow: %v", err)
 	}

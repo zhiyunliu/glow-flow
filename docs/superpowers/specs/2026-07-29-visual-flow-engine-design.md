@@ -58,7 +58,7 @@ internal/
 
 ## 4. 核心概念
 
-### 4.1 FlowDefinition
+### 4.1 ChainDefinition
 
 流程定义是可视化编辑器导出的配置结构，包含：
 
@@ -70,10 +70,10 @@ internal/
 建议将配置结构拆分为：
 
 ```go
-type FlowDefinition struct {
+type ChainDefinition struct {
     ID string `json:"id"`
     Version string `json:"version"`
-    Metadata FlowMetadata `json:"metadata"`
+    Metadata ChainMetadata `json:"metadata"`
     Endpoints []Endpoint `json:"endpoints"`
     Nodes []NodeDefinition `json:"nodes"`
     Connections []ConnectionDefinition `json:"connections"`
@@ -159,7 +159,7 @@ type Registry interface {
 
 ### 6.1 编译阶段
 
-流程定义加载后，需要通过独立编译器完成编译。编译器依赖流程定义和节点注册中心，不把编译逻辑放进 Engine，也不塞进 FlowDefinition 这种纯配置结构：
+流程定义加载后，需要通过独立编译器完成编译。编译器依赖流程定义和节点注册中心，不把编译逻辑放进 Engine，也不塞进 ChainDefinition 这种纯配置结构：
 
 1. 解析流程 JSON。
 2. 校验节点类型是否存在。
@@ -169,13 +169,13 @@ type Registry interface {
 
 ```go
 type FlowCompiler interface {
-    Compile(def FlowDefinition, registry Registry) (*CompiledFlow, error)
+    Compile(def ChainDefinition, registry Registry) (*CompiledFlow, error)
 }
 ```
 
 ```go
 type CompiledFlow struct {
-    Definition FlowDefinition
+    Definition ChainDefinition
     Nodes map[string]CompiledNode
     Graph map[string]map[string][]CompiledNode
 }
@@ -280,32 +280,32 @@ type CapabilityConfig struct {
 引擎应支持同时管理多个流程定义，并且每个流程定义都可以独立运行、升级、暂停和停止。建议将职责明确划分为：
 
 - Engine：负责加载流程集合、统一调度、管理运行实例与生命周期。
-- FlowDefinition：保持为纯配置结构，承载流程 ID、版本、节点和连线定义。
-- FlowCompiler：负责把 FlowDefinition 编译为 CompiledFlow。
+- ChainDefinition：保持为纯配置结构，承载流程 ID、版本、节点和连线定义。
+- FlowCompiler：负责把 ChainDefinition 编译为 CompiledFlow。
 
 ```go
-func (e *Engine) Load(defs ...FlowDefinition) error
+func (e *Engine) Load(defs ...ChainDefinition) error
 func (e *Engine) Run() error
 func (e *Engine) Stop() error
 func (e *Engine) Pause(flowID string) error
 func (e *Engine) Resume(flowID string) error
-func (e *Engine) Reload(def FlowDefinition) error
+func (e *Engine) Reload(def ChainDefinition) error
 ```
 
 ### 10.1 运行流程
 
-1. Load：将一组 FlowDefinition 一次性注册到引擎。
+1. Load：将一组 ChainDefinition 一次性注册到引擎。
 2. Compile：由 FlowCompiler 完成编译，生成可执行拓扑。
 3. Run：引擎启动已加载流程集合的执行。
 4. Stop：停止引擎上所有已启动的流程实例。
 5. Pause/Resume：按 flowID 对指定流程进行暂停或恢复，保持对其他流程的影响最小。
-6. Reload：用新的 FlowDefinition 替换同一个 flowID 的旧版本，flowID 从 FlowDefinition.ID 读取，不需要额外参数。
+6. Reload：用新的 ChainDefinition 替换同一个 flowID 的旧版本，flowID 从 ChainDefinition.ID 读取，不需要额外参数。
 
 ### 10.2 热更新策略
 
 热更新的目标是“新配置生效，旧实例继续运行”。建议采用以下规则：
 
-- 以 FlowDefinition.ID 作为流程唯一标识。
+- 以 ChainDefinition.ID 作为流程唯一标识。
 - 同一个 flowID 的新版本配置会被视为新的“定义版本”。
 - 已经启动的运行实例继续使用旧版本编译结果。
 - 新的调度请求使用最新版本定义。
@@ -315,7 +315,7 @@ func (e *Engine) Reload(def FlowDefinition) error
 type FlowVersion struct {
     FlowID string
     Version string
-    Definition FlowDefinition
+    Definition ChainDefinition
     Compiled *CompiledFlow
 }
 ```
@@ -402,7 +402,7 @@ type FlowVersion struct {
 
 建议按下面顺序落地：
 
-1. 完成 FlowDefinition 与节点定义结构。
+1. 完成 ChainDefinition 与节点定义结构。
 2. 完成注册中心与节点工厂。
 3. 完成编译器，将配置图转换成执行拓扑。
 4. 完成基于 `ExecuteResult.RelationType` 的调度器。

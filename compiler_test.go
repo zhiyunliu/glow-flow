@@ -44,7 +44,7 @@ func TestFlowCompilerBuildsRelationGraph(t *testing.T) {
 		t.Fatalf("register task node: %v", err)
 	}
 
-	compiled, err := NewFlowCompiler().Compile(FlowDefinition{
+	compiled, err := NewFlowCompiler().Compile(ChainDefinition{
 		ID:      "flow-a",
 		Version: "v1",
 		Nodes: []NodeDefinition{
@@ -78,7 +78,7 @@ func TestFlowCompilerBuildsRelationGraph(t *testing.T) {
 }
 
 func TestFlowCompilerRejectsUnknownNodeType(t *testing.T) {
-	_, err := NewFlowCompiler().Compile(FlowDefinition{
+	_, err := NewFlowCompiler().Compile(ChainDefinition{
 		ID:      "flow-a",
 		Version: "v1",
 		Nodes: []NodeDefinition{

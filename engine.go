@@ -19,7 +19,7 @@ type flowSeries struct {
 }
 
 type flowRuntime struct {
-	definition FlowDefinition
+	definition ChainDefinition
 	compiled   *CompiledFlow
 }
 
@@ -44,7 +44,7 @@ func NewEngine(opts ...Option) *Engine {
 	return engine
 }
 
-func (e *Engine) Load(defs ...FlowDefinition) error {
+func (e *Engine) Load(defs ...ChainDefinition) error {
 	for _, def := range defs {
 		if err := e.loadLocked(def); err != nil {
 			return err
@@ -109,11 +109,11 @@ func (e *Engine) Resume(flowID string) error {
 	return nil
 }
 
-func (e *Engine) Reload(def FlowDefinition) error {
+func (e *Engine) Reload(def ChainDefinition) error {
 	return e.loadLocked(def)
 }
 
-func (e *Engine) loadLocked(def FlowDefinition) error {
+func (e *Engine) loadLocked(def ChainDefinition) error {
 	if def.ID == "" {
 		return fmt.Errorf("flow id is empty")
 	}
