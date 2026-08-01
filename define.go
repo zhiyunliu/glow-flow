@@ -12,6 +12,8 @@ type Layout struct {
 type ChainMetadata struct {
 	ID        string         `json:"id"`
 	Name      string         `json:"name"`
+	Root      bool           `json:"root"`
+	Disabled  bool           `json:"disabled"`
 	Status    string         `json:"status"`
 	ExtParams map[string]any `json:"extparams,omitempty"`
 	Layout    Layout         `json:"layout,omitempty"`

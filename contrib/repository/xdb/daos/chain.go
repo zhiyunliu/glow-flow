@@ -8,6 +8,10 @@ import (
 	"github.com/zhiyunliu/glue/xdb"
 )
 
+type chainNoParam struct {
+	ChainNo string `json:"chain_no"`
+}
+
 // LoadChainDefinitions loads the chain definitions from the XDB.
 func LoadChainDefinitions(ctx context.Context, dbObj xdb.Executer) (result []*models.ChainDefinition, err error) {
 	result = make([]*models.ChainDefinition, 0)
@@ -19,13 +23,32 @@ func LoadChainDefinitions(ctx context.Context, dbObj xdb.Executer) (result []*mo
 	return
 }
 
+func LoadChainDefinition(ctx context.Context, dbObj xdb.Executer, chainNo string) (result []*models.ChainDefinition, err error) {
+	result = make([]*models.ChainDefinition, 0)
+	err = dbObj.QueryAs(ctx, sqls.LoadChainDefinition, chainNoParam{ChainNo: chainNo}, &result)
+	return
+}
+
 func LoadChainNodes(ctx context.Context, dbObj xdb.Executer) (result []*models.NodeDefinition, err error) {
 	result = make([]*models.NodeDefinition, 0)
 	err = dbObj.QueryAs(ctx, sqls.LoadChainNodes, nil, &result)
 	return
 }
+
+func LoadChainNodesByChainNo(ctx context.Context, dbObj xdb.Executer, chainNo string) (result []*models.NodeDefinition, err error) {
+	result = make([]*models.NodeDefinition, 0)
+	err = dbObj.QueryAs(ctx, sqls.LoadChainNodesByChainNo, chainNoParam{ChainNo: chainNo}, &result)
+	return
+}
+
 func LoadChainConnections(ctx context.Context, dbObj xdb.Executer) (result []*models.ConnectionDefinition, err error) {
 	result = make([]*models.ConnectionDefinition, 0)
 	err = dbObj.QueryAs(ctx, sqls.LoadChainConnections, nil, &result)
+	return
+}
+
+func LoadChainConnectionsByChainNo(ctx context.Context, dbObj xdb.Executer, chainNo string) (result []*models.ConnectionDefinition, err error) {
+	result = make([]*models.ConnectionDefinition, 0)
+	err = dbObj.QueryAs(ctx, sqls.LoadChainConnectionsByChainNo, chainNoParam{ChainNo: chainNo}, &result)
 	return
 }

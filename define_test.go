@@ -10,9 +10,11 @@ func TestChainDefinitionPreservesJSONShape(t *testing.T) {
 		ID:      "chain-a",
 		Version: "v1",
 		Metadata: ChainMetadata{
-			ID:     "meta-a",
-			Name:   "Chain A",
-			Status: "active",
+			ID:       "meta-a",
+			Name:     "Chain A",
+			Root:     true,
+			Disabled: true,
+			Status:   "active",
 			ExtParams: map[string]any{
 				"level": "gold",
 			},
@@ -51,6 +53,9 @@ func TestChainDefinitionPreservesJSONShape(t *testing.T) {
 		if _, ok := metadata[field]; !ok {
 			t.Fatalf("metadata json field %q is missing in %s", field, string(data))
 		}
+	}
+	if metadata["root"] != true || metadata["disabled"] != true {
+		t.Fatalf("metadata root/disabled values = %v/%v, want true/true", metadata["root"], metadata["disabled"])
 	}
 }
 

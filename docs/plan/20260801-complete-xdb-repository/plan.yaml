@@ -1,0 +1,252 @@
+plan_id: 20260801-complete-xdb-repository
+objective: Complete contrib/repository/xdb Go repository from SQL Server schema in contrib/repository/xdb/sql.mssql.sql
+created_at: "2026-08-01T00:00:00+08:00"
+created_by: gem-planner
+status: completed
+tldr: |
+  Complete the XDB repository as the SQL Server-backed DataRepository adapter for ChainDefinition loading.
+  Ground row models and SQL constants in sql.mssql.sql, then assemble glowflow.ChainDefinition values.
+  Validate with focused xdb tests plus go test, go vet, and diagnostics.
+plan_metrics:
+  wave_1_task_count: 1
+  total_dependencies: 3
+  risk_score: medium
+quality_warnings:
+  - Version selection is not explicit in DataRepository; tests must pin the expected latest active version contract using older active, newer active, and newest disabled rows.
+  - SQL templates should follow glue/xdb conventions, including first-line --sql markers where applicable.
+  - Existing xdb model and SQL files are skeletal; execution should avoid broad public API changes.
+assumptions:
+  - sql.mssql.sql is the authoritative schema for xdb row models and column names.
+  - DataRepository has no version parameter, so LoadChainDefinition selects the latest active version for a chain.
+  - LoadChainDefinitions returns one executable ChainDefinition per active chain using the latest active version.
+  - flow_chain_version is the executable metadata source because nodes and connections reference version_id.
+  - flow_chain_definition can be used for chain-level presence/status filtering but must not replace version-scoped output.
+  - JSON columns extparams, layout, and layout_definition are nullable and invalid JSON should return an error.
+  - SQL Server bracketed columns such as [name], [status], [operator], and [desc] require explicit aliases for mapping.
+  - Public glowflow.DataRepository, ChainDefinition, NodeDefinition, and ConnectionDefinition interfaces remain unchanged.
+tasks:
+  - id: T1-xdb-contract-tests
+    title: Pin XDB repository behavior
+    description: Add focused tests that define SQL-backed loading behavior before production implementation.
+    wave: 1
+    agent: gem-implementer
+    status: completed
+    covers:
+      - AC1: XDB adapter maps SQL Server schema rows to glowflow.ChainDefinition.
+      - AC2: List and single-chain loading use the latest active chain version.
+      - AC3: JSON fields are decoded into ExtParams and Layout values.
+      - AC4: Missing chains and malformed persisted JSON have explicit error behavior.
+    dependencies: []
+    conflicts_with: []
+    context_files:
+      - path: contrib/repository/xdb/sql.mssql.sql
+        description: Authoritative SQL Server table and column contract.
+      - path: repository.go
+        description: DataRepository interface to satisfy without signature changes.
+      - path: define.go
+        description: Target public ChainDefinition, ChainMetadata, NodeDefinition, and ConnectionDefinition shapes.
+      - path: contrib/repository/xdb/xdb.go
+        description: Current repository skeleton and buildChainDefinition boundary.
+      - path: contrib/repository/xdb/daos/chain.go
+        description: Current DAO query surface using glue/xdb Executer.
+      - path: contrib/repository/xdb/sqls/chain.go
+        description: Current empty SQL constants.
+    flags:
+      flaky: false
+      retries_used: 0
+      requires_design_validation: false
+    acceptance_criteria:
+      - Tests cover LoadChainDefinitions returning only active chains with their latest active version.
+      - Tests cover LoadChainDefinition returning the requested chain and excluding other chains.
+      - Tests cover node assembly from flow_chain_node joined with flow_node_definition.
+      - Tests cover connection assembly from flow_chain_connection.
+      - Tests cover extparams and layout JSON decoding for chain metadata and chain nodes.
+      - Tests cover no database foreign keys being required for repository assembly.
+      - Tests confirm chain_no naming is used and chain_id is not reintroduced.
+      - The first focused test run fails for missing model fields, empty SQL constants, or unimplemented repository assembly.
+    success_criteria:
+      - go test ./contrib/repository/xdb -run XDB fails for the expected missing implementation reason before T2.
+    tech_stack:
+      - Go 1.26
+      - github.com/zhiyunliu/glue v0.8.25
+      - glue/xdb QueryAs SQL templates
+    test_coverage: New xdb package tests should exercise repository-level behavior and DAO SQL constant presence.
+    diag: null
+    handoff:
+      do_not_reinvestigate:
+        - DataRepository exposes no version argument.
+        - SQL Server DDL is authoritative for xdb schema.
+        - Existing jsonfile repository is also skeletal and is not the implementation model.
+      required_test_first: Add XDB repository contract tests before production edits; run go test ./contrib/repository/xdb -run XDB.
+      target_files:
+        - contrib/repository/xdb/xdb_test.go
+        - contrib/repository/xdb/daos/chain_test.go
+      minimal_change: Add focused tests only; do not edit production xdb code in this task.
+      acceptance_checks:
+        - go test ./contrib/repository/xdb -run XDB
+  - id: T2-xdb-models-sql-and-daos
+    title: Complete row models, SQL templates, and DAO queries
+    description: Align xdb row models and DAO query surfaces with the SQL Server DDL and repository contract.
+    wave: 2
+    agent: gem-implementer
+    status: completed
+    covers:
+      - AC1: SQL Server tables have matching Go row models.
+      - AC5: SQL constants are executable glue/xdb templates.
+      - AC6: DAO methods can load all rows and scoped rows needed by repository assembly.
+    dependencies:
+      - T1-xdb-contract-tests
+    conflicts_with: []
+    context_files:
+      - path: contrib/repository/xdb/sql.mssql.sql
+        description: Source for tables, columns, nullable fields, indexes, and naming.
+      - path: contrib/repository/xdb/models/chain.go
+        description: Empty ChainDefinition model target.
+      - path: contrib/repository/xdb/models/node.go
+        description: Incomplete node model target.
+      - path: contrib/repository/xdb/models/connection.go
+        description: Empty connection model target.
+      - path: contrib/repository/xdb/sqls/chain.go
+        description: Empty SQL constants target.
+      - path: contrib/repository/xdb/daos/chain.go
+        description: DAO query target.
+    flags:
+      flaky: false
+      retries_used: 0
+      requires_design_validation: false
+    acceptance_criteria:
+      - Models represent flow_chain_definition, flow_chain_version, flow_chain_node, flow_chain_connection, flow_node_definition, flow_layout_definition, and flow_basic_infra as needed by queries.
+          - flow_layout_definition and flow_basic_infra are support row models only unless public fields require mapping; do not expand repository output shape for them.
+      - Nullable SQL Server fields have safe Go representations that QueryAs can scan without panics.
+      - SQL constants have first-line --sql markers where glue/xdb templates expect them.
+      - SQL uses chain_no consistently and does not reference chain_id.
+      - SQL aliases reserved or bracketed SQL Server columns to stable Go mapping names.
+      - DAO methods support loading all active chain versions plus nodes and connections for those versions.
+      - DAO methods support loading a single chain by chain_no with the same version-selection contract as list loading.
+      - Existing LoadChainDefinitions, LoadChainNodes, and LoadChainConnections callers remain supported or are migrated consistently.
+    success_criteria:
+      - go test ./contrib/repository/xdb -run XDB progresses past model and SQL-constant failures.
+      - go test ./contrib/repository/xdb/daos passes if DAO package tests are added.
+    tech_stack:
+      - Go 1.26
+      - SQL Server
+      - github.com/zhiyunliu/glue/xdb
+    test_coverage: T1 tests plus optional DAO-level tests validate SQL string shape and scan contracts.
+    diag: null
+    handoff:
+      do_not_reinvestigate:
+        - Do not add SQL foreign key constraints.
+        - Do not restore FlowDefinition or FlowMetadata naming.
+        - Do not change root glowflow definition structs.
+      required_test_first: Start from the failing T1 test output and implement only the model, SQL, and DAO surface required to advance it.
+      target_files:
+        - contrib/repository/xdb/models/chain.go
+        - contrib/repository/xdb/models/node.go
+        - contrib/repository/xdb/models/connection.go
+        - contrib/repository/xdb/sqls/chain.go
+        - contrib/repository/xdb/daos/chain.go
+      minimal_change: Add schema-backed row structs, SQL constants, and query functions without changing public repository interfaces.
+      acceptance_checks:
+        - go test ./contrib/repository/xdb -run XDB
+        - go test ./contrib/repository/xdb/daos
+  - id: T3-xdb-repository-assembly
+    title: Assemble glowflow ChainDefinitions
+    description: Complete xdbRepository loading methods and conversion from xdb row models to public definitions.
+    wave: 3
+    agent: gem-implementer
+    status: completed
+    covers:
+      - AC2: Repository returns executable public ChainDefinition values.
+      - AC3: JSON fields decode correctly.
+      - AC4: Error behavior is explicit and tested.
+      - AC7: Chain/node/connection relationships are assembled in code.
+    dependencies:
+      - T2-xdb-models-sql-and-daos
+    conflicts_with: []
+    context_files:
+      - path: contrib/repository/xdb/xdb.go
+        description: Owns NewRepository, LoadChainDefinitions, LoadChainDefinition, and buildChainDefinition.
+      - path: contrib/repository/xdb/daos/chain.go
+        description: Provides repository data inputs from T2.
+      - path: contrib/repository/xdb/models/chain.go
+        description: Provides row model fields from T2.
+      - path: define.go
+        description: Public output struct contract.
+    flags:
+      flaky: false
+      retries_used: 0
+      requires_design_validation: false
+    acceptance_criteria:
+      - LoadChainDefinitions returns stable ChainDefinition output grouped by chain_no and selected version_id.
+      - LoadChainDefinition returns the same assembled shape as the list path for the requested chain_no.
+      - ChainDefinition.ID is populated from chain_no and Version is populated from version_id in a stable string format.
+      - ChainDefinition.Metadata contains name, status, extparams, layout, and description-derived values where public fields exist.
+      - NodeDefinition values include node_def_no as ID, node type/name from flow_node_definition, and per-chain extparams/layout overrides from flow_chain_node.
+      - ConnectionDefinition values include from_id, to_id, type, and remark from flow_chain_connection.
+      - Repository assembly does not require database foreign keys and tolerates out-of-order DAO row results.
+      - Malformed JSON in persisted extparams/layout returns contextual errors instead of silent defaults.
+    success_criteria:
+      - go test ./contrib/repository/xdb -run XDB passes.
+      - get_errors reports no relevant diagnostics in touched xdb Go files.
+    tech_stack:
+      - Go 1.26
+      - encoding/json
+      - github.com/zhiyunliu/glue
+    test_coverage: T1 repository tests are the main behavior gate for assembly and conversion.
+    diag: null
+    handoff:
+      do_not_reinvestigate:
+        - Keep repository.go unchanged.
+        - Keep jsonfile repository out of scope.
+        - ChainDefinition.Endpoints has no SQL Server source in the current DDL and should remain empty unless tests define otherwise.
+      required_test_first: Use T1/T2 failing repository tests as the starting point; no broad refactor before the focused test passes.
+      target_files:
+        - contrib/repository/xdb/xdb.go
+        - contrib/repository/xdb/xdb_test.go
+      minimal_change: Complete repository conversion and loading paths behind the existing NewRepository API.
+      acceptance_checks:
+        - go test ./contrib/repository/xdb -run XDB
+        - get_errors on contrib/repository/xdb
+  - id: T4-final-validation-review
+    title: Validate XDB repository completion
+    description: Run final repository checks and review plan-scope boundaries for schema, naming, and tests.
+    wave: 4
+    agent: gem-reviewer
+    status: completed
+    covers:
+      - AC8: Final change is tested, scoped, and consistent with repository conventions.
+    dependencies:
+      - T3-xdb-repository-assembly
+    conflicts_with: []
+    context_files:
+      - path: contrib/repository/xdb/sql.mssql.sql
+        description: Final schema source for review.
+      - path: contrib/repository/xdb/models
+        description: Final row-model package under review.
+      - path: contrib/repository/xdb/sqls/chain.go
+        description: Final SQL template constants under review.
+      - path: contrib/repository/xdb/daos/chain.go
+        description: Final DAO query surface under review.
+      - path: contrib/repository/xdb/xdb.go
+        description: Final repository implementation under review.
+      - path: contrib/repository/xdb/xdb_test.go
+        description: Final repository behavior tests under review.
+    flags:
+      flaky: false
+      retries_used: 0
+      requires_design_validation: false
+    acceptance_criteria:
+      - go test ./contrib/repository/xdb exits 0.
+      - go test ./... exits 0.
+      - go vet ./... exits 0.
+      - go list ./... exits 0.
+      - Diagnostics show no relevant syntax or type errors in touched files.
+      - Search confirms chain_id was not reintroduced under contrib/repository/xdb.
+      - Search confirms FlowDefinition and FlowMetadata were not restored under contrib/repository/xdb.
+      - Review confirms no database foreign key constraints were added to sql.mssql.sql.
+    success_criteria:
+      - Reviewer finds no mismatch between sql.mssql.sql columns and active xdb model/query fields.
+      - Reviewer finds no missing coverage for list, single load, version selection, JSON decoding, nodes, and connections.
+    requires_review: true
+    review_depth: lightweight
+    review_security_sensitive: false

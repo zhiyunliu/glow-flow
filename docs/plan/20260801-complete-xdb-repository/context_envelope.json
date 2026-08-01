@@ -1,0 +1,295 @@
+{
+  "context_envelope": {
+    "meta": {
+      "plan_id": "20260801-complete-xdb-repository",
+      "created_at": "2026-08-01T00:00:00+08:00",
+      "last_updated": "2026-08-01T00:00:00+08:00",
+      "version": "1"
+    },
+    "tech_stack": [
+      {
+        "name": "Go",
+        "version": "1.26",
+        "usage_context": "Library module github.com/zhiyunliu/glow-flow and xdb repository adapter",
+        "config_files": ["go.mod"]
+      },
+      {
+        "name": "github.com/zhiyunliu/glue",
+        "version": "v0.8.25",
+        "usage_context": "glue.DB connection lookup and glue/xdb QueryAs execution",
+        "config_files": ["go.mod"]
+      },
+      {
+        "name": "SQL Server",
+        "version": "schema defined by contrib/repository/xdb/sql.mssql.sql",
+        "usage_context": "Authoritative persistent schema for XDB repository rows",
+        "config_files": ["contrib/repository/xdb/sql.mssql.sql"]
+      }
+    ],
+    "conventions": [
+      "Respond to the user in Simplified Chinese.",
+      "Public repository contract is glowflow.DataRepository in repository.go.",
+      "Definition objects use Chain* naming; do not restore FlowDefinition or FlowMetadata.",
+      "SQL schema uses chain_no, not chain_id.",
+      "SQL constants for glue/xdb templates should use first-line --sql markers where applicable.",
+      "SQL Server reserved/bracketed columns should be aliased for stable Go scan mapping.",
+      "Tests are Go package tests run with go test; go vet ./... currently exits 0."
+    ],
+    "constraints": {
+      "hard": [
+        "Do not implement code during planning phase.",
+        "Use apply_patch for later file edits.",
+        "Do not revert unrelated user changes.",
+        "Treat contrib/repository/xdb/sql.mssql.sql as authoritative schema.",
+        "Do not add database foreign key constraints.",
+        "Keep glowflow.DataRepository signatures unchanged.",
+        "Keep chain_no naming throughout xdb code."
+      ],
+      "soft": [
+        "Keep changes scoped to contrib/repository/xdb and focused tests unless validation requires metadata updates.",
+        "Prefer repository-level behavior tests before implementation.",
+        "Preserve existing public API style and avoid broad jsonfile repository work."
+      ],
+      "compatibility": [
+        "LoadChainDefinitions and LoadChainDefinition return public glowflow.ChainDefinition values.",
+        "ChainDefinition.Endpoints has no SQL source in current DDL and should remain empty unless requirements change.",
+        "Nullable SQL fields and nullable JSON text need safe mapping without scan panics."
+      ],
+      "security_requirements": [
+        "Do not log database credentials or connection names beyond existing non-secret names.",
+        "Use parameterized DAO inputs for chain_no filters; do not concatenate user input into SQL."
+      ]
+    },
+    "architecture_snapshot": {
+      "key_dirs": [
+        ".",
+        "contrib/repository/xdb",
+        "contrib/repository/xdb/models",
+        "contrib/repository/xdb/sqls",
+        "contrib/repository/xdb/daos",
+        "docs/plan"
+      ],
+      "patterns": [
+        "Root package owns public definition structs and repository interface.",
+        "contrib/repository/xdb should be an optional SQL-backed DataRepository adapter.",
+        "xdb.go resolves glue.DB(dbConnName), delegates queries to daos, then assembles public ChainDefinition values.",
+        "daos package uses xdb.Executer.QueryAs with SQL constants from sqls package.",
+        "sql.mssql.sql defines table relationships in columns/indexes only; no database FKs by convention."
+      ],
+      "key_components": [
+        {
+          "name": "DataRepository contract",
+          "location": "repository.go",
+          "responsibility": [
+            "Expose LoadChainDefinitions(ctx) and LoadChainDefinition(ctx, chainID).",
+            "Return public ChainDefinition values without leaking xdb row models."
+          ]
+        },
+        {
+          "name": "Public definition model",
+          "location": "define.go",
+          "responsibility": [
+            "Declare ChainDefinition, ChainMetadata, NodeDefinition, ConnectionDefinition, Layout.",
+            "Define JSON-shaped output that repository adapters assemble."
+          ]
+        },
+        {
+          "name": "SQL Server schema",
+          "location": "contrib/repository/xdb/sql.mssql.sql",
+          "responsibility": [
+            "Define flow_chain_definition and flow_chain_version metadata tables.",
+            "Define flow_chain_node and flow_chain_connection version-scoped topology tables.",
+            "Define flow_node_definition, flow_layout_definition, and flow_basic_infra support tables."
+          ]
+        },
+        {
+          "name": "XDB repository skeleton",
+          "location": "contrib/repository/xdb/xdb.go",
+          "responsibility": [
+            "Create repository from db connection name.",
+            "Load all chain rows, node rows, connection rows, then build ChainDefinition output.",
+            "Currently has unimplemented LoadChainDefinition and buildChainDefinition."
+          ]
+        },
+        {
+          "name": "XDB DAO layer",
+          "location": "contrib/repository/xdb/daos/chain.go",
+          "responsibility": [
+            "Query row models with glue/xdb Executer.",
+            "Currently calls empty SQL constants and lacks scoped latest-version loading."
+          ]
+        }
+      ]
+    },
+    "research_digest": {
+      "relevant_files": [
+        {
+          "path": "contrib/repository/xdb/sql.mssql.sql",
+          "purpose": [
+            "Authoritative source for xdb table names, columns, nullability, indexes, and descriptions.",
+            "Defines flow_chain_definition, flow_chain_version, flow_chain_node, flow_chain_connection, flow_node_definition, flow_layout_definition, flow_basic_infra."
+          ],
+          "confidence": 0.99
+        },
+        {
+          "path": "contrib/repository/xdb/xdb.go",
+          "purpose": [
+            "Primary repository implementation target.",
+            "LoadChainDefinitions is skeletal and LoadChainDefinition/buildChainDefinition are nil."
+          ],
+          "confidence": 0.98
+        },
+        {
+          "path": "contrib/repository/xdb/sqls/chain.go",
+          "purpose": [
+            "Primary SQL constants target.",
+            "LoadChainDefinitions, LoadChainNodes, and LoadChainConnections are currently empty strings."
+          ],
+          "confidence": 0.98
+        },
+        {
+          "path": "contrib/repository/xdb/daos/chain.go",
+          "purpose": [
+            "Primary DAO target.",
+            "Current QueryAs calls use nil params and all-row loaders only."
+          ],
+          "confidence": 0.95
+        },
+        {
+          "path": "contrib/repository/xdb/models/chain.go",
+          "purpose": [
+            "Primary chain/version row model target.",
+            "Currently declares empty ChainDefinition struct."
+          ],
+          "confidence": 0.98
+        },
+        {
+          "path": "contrib/repository/xdb/models/node.go",
+          "purpose": [
+            "Primary node row model target.",
+            "Currently has only Id and Name, missing schema fields and version-scoped chain node data."
+          ],
+          "confidence": 0.96
+        },
+        {
+          "path": "contrib/repository/xdb/models/connection.go",
+          "purpose": [
+            "Primary connection row model target.",
+            "Currently declares empty ConnectionDefinition struct."
+          ],
+          "confidence": 0.98
+        },
+        {
+          "path": "define.go",
+          "purpose": [
+            "Public output target for assembled data.",
+            "ChainDefinition has ID, Version, Metadata, Endpoints, Nodes, and Connections."
+          ],
+          "confidence": 0.96
+        },
+        {
+          "path": "repository.go",
+          "purpose": [
+            "Public repository interface source of truth.",
+            "No version parameter is available for single-chain loading."
+          ],
+          "confidence": 0.96
+        }
+      ],
+      "patterns_found": [
+        {
+          "name": "Repository adapter boundary",
+          "category": "architecture",
+          "confidence": 0.9,
+          "example_location": ["repository.go", "contrib/repository/xdb/xdb.go"]
+        },
+        {
+          "name": "Version-scoped executable topology",
+          "category": "data-model",
+          "confidence": 0.9,
+          "example_location": ["contrib/repository/xdb/sql.mssql.sql"]
+        },
+        {
+          "name": "glue/xdb DAO query pattern",
+          "category": "persistence",
+          "confidence": 0.85,
+          "example_location": ["contrib/repository/xdb/daos/chain.go"]
+        }
+      ],
+      "gotchas": [
+        {
+          "text": "flow_chain_definition and flow_chain_version duplicate metadata; executable output likely needs version rows because nodes/connections reference version_id.",
+          "confidence": 0.86
+        },
+        {
+          "text": "LoadChainDefinition has only chainID input; latest-version behavior must be pinned by tests because API lacks version selection.",
+          "confidence": 0.84
+        },
+        {
+          "text": "SQL Server columns [name], [status], [operator], and [desc] can be awkward for scans unless explicitly selected or aliased.",
+          "confidence": 0.9
+        },
+        {
+          "text": "JSON columns are varchar(max); repository assembly needs decode errors instead of silently dropping malformed content.",
+          "confidence": 0.88
+        },
+        {
+          "text": "flow_basic_infra and flow_layout_definition are in DDL but have no public fields in ChainDefinition unless future requirements add usage.",
+          "confidence": 0.78
+        },
+        {
+          "text": "docker compose -f docker-compose.yml config currently exits 1 in user context; avoid making Docker validation a required gate.",
+          "confidence": 0.82
+        }
+      ]
+    },
+    "prior_decisions": [
+      {
+        "decision": "Plan implementation around xdb repository behavior, not broad engine/compiler changes.",
+        "rationale": [
+          "Objective targets contrib/repository/xdb.",
+          "repository.go and define.go already expose the needed public contracts."
+        ],
+        "confidence": 0.95
+      },
+      {
+        "decision": "Use latest active version as the assumed selection contract for DataRepository loads.",
+        "rationale": [
+          "DataRepository has no version parameter.",
+          "flow_chain_version has identity version_id and status fields."
+        ],
+        "confidence": 0.76
+      },
+      {
+        "decision": "Keep ChainDefinition.Endpoints empty for xdb output unless future schema adds endpoint rows.",
+        "rationale": [
+          "sql.mssql.sql has no endpoint table or endpoint columns.",
+          "Adding synthesized endpoints would be speculative."
+        ],
+        "confidence": 0.84
+      },
+      {
+        "decision": "Include tests before production edits in the DAG.",
+        "rationale": [
+          "Existing xdb code is skeletal and version-selection behavior is ambiguous.",
+          "Contract tests prevent implementing a plausible but unverified mapping."
+        ],
+        "confidence": 0.9
+      }
+    ],
+    "reuse_notes": [
+      {
+        "path": "docs/plan/20260801-flow-to-chain-definitions/context_envelope.json",
+        "trust": "high"
+      },
+      {
+        "path": "docs/plan/20260801-complete-redis-state-storage/plan.yaml",
+        "trust": "medium"
+      },
+      {
+        "path": "/memories/repo/d_default_node_factory_nil.md",
+        "trust": "low"
+      }
+    ]
+  }
+}
