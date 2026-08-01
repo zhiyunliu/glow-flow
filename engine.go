@@ -27,7 +27,7 @@ type chainRuntime struct {
 func NewEngine(opts ...Option) *Engine {
 	engine := &Engine{
 		options: &options{
-			dataRepository: DefaultDataRepository,
+			dataRepository: DefaultRepository,
 			stateStorage:   DefaultStateStorage,
 		},
 		chains: cmap.New[*chainSeries](),

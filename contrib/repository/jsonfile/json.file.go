@@ -1,6 +1,10 @@
 package jsonfile
 
-import glowflow "github.com/zhiyunliu/glow-flow"
+import (
+	"context"
+
+	glowflow "github.com/zhiyunliu/glow-flow"
+)
 
 // NewRepository creates a new JSON file repository.
 func NewRepository() glowflow.DataRepository {
@@ -10,10 +14,10 @@ func NewRepository() glowflow.DataRepository {
 type jsonFileRepository struct {
 }
 
-func (r *jsonFileRepository) LoadChainDefinitions() ([]*glowflow.ChainDefinition, error) {
+func (r *jsonFileRepository) LoadChainDefinitions(ctx context.Context) ([]*glowflow.ChainDefinition, error) {
 	return nil, nil
 }
 
-func (r *jsonFileRepository) LoadChainDefinition(chainID string) (*glowflow.ChainDefinition, error) {
+func (r *jsonFileRepository) LoadChainDefinition(ctx context.Context, chainID string) (*glowflow.ChainDefinition, error) {
 	return nil, nil
 }

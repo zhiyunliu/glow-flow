@@ -9,6 +9,6 @@ import (
 )
 
 func init() {
-	glowflow.DefaultDataRepository = jsonfile.NewRepository()
+	glowflow.DefaultRepository = jsonfile.NewRepository()
 	glowflow.DefaultStateStorage = memory.NewStateStorage()
 }

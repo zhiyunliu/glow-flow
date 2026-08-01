@@ -10,14 +10,13 @@ func TestChainDefinitionPreservesJSONShape(t *testing.T) {
 		ID:      "chain-a",
 		Version: "v1",
 		Metadata: ChainMetadata{
-			ID:       "meta-a",
-			Name:     "Chain A",
-			Root:     true,
-			Disabled: false,
+			ID:     "meta-a",
+			Name:   "Chain A",
+			Status: "active",
 			ExtParams: map[string]any{
 				"level": "gold",
 			},
-			Layout: Layout{Desc: "main", Icon: "bolt", H: 1, X: 2, Y: 3, W: 4},
+			Layout: Layout{Icon: "bolt", H: 1, X: 2, Y: 3, W: 4},
 		},
 		Endpoints: []EndpointDefinition{{ID: "endpoint-a", Name: "Endpoint A"}},
 		Nodes:     []NodeDefinition{{ID: "node-a", Type: "start", Name: "Start"}},

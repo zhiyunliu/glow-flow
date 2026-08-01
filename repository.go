@@ -1,9 +1,11 @@
 package glowflow
 
+import "context"
+
 // DataRepository is the interface for the data repository.
-var DefaultDataRepository DataRepository
+var DefaultRepository DataRepository
 
 type DataRepository interface {
-	LoadChainDefinitions() ([]*ChainDefinition, error)
-	LoadChainDefinition(chainID string) (*ChainDefinition, error)
+	LoadChainDefinitions(ctx context.Context) ([]*ChainDefinition, error)
+	LoadChainDefinition(ctx context.Context, chainID string) (*ChainDefinition, error)
 }

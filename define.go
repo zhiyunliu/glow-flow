@@ -1,7 +1,6 @@
 package glowflow
 
 type Layout struct {
-	Desc string `json:"desc,omitempty"`
 	Icon string `json:"icon,omitempty"`
 	H    int    `json:"H,omitempty"` // 高度
 	X    int    `json:"X,omitempty"` // X轴位置
@@ -13,8 +12,7 @@ type Layout struct {
 type ChainMetadata struct {
 	ID        string         `json:"id"`
 	Name      string         `json:"name"`
-	Root      bool           `json:"root"`
-	Disabled  bool           `json:"disabled"`
+	Status    string         `json:"status"`
 	ExtParams map[string]any `json:"extparams,omitempty"`
 	Layout    Layout         `json:"layout,omitempty"`
 }
@@ -24,6 +22,7 @@ type EndpointDefinition struct {
 	ID        string         `json:"id"`
 	Name      string         `json:"name"`
 	ExtParams map[string]any `json:"extparams,omitempty"`
+	Desc      string         `json:"desc,omitempty"`
 }
 
 // ChainDefinition is the definition of the chain.
