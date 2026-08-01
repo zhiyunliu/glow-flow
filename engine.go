@@ -26,8 +26,11 @@ type chainRuntime struct {
 // NewEngine creates a new engine with the given options.
 func NewEngine(opts ...Option) *Engine {
 	engine := &Engine{
-		options: &options{},
-		chains:  cmap.New[*chainSeries](),
+		options: &options{
+			dataRepository: DefaultDataRepository,
+			stateStorage:   DefaultStateStorage,
+		},
+		chains: cmap.New[*chainSeries](),
 	}
 	for _, opt := range opts {
 		opt(engine.options)

@@ -6,7 +6,10 @@ import (
 	"time"
 )
 
-var ErrStateNotFound = errors.New("state not found")
+var (
+	ErrStateNotFound    = errors.New("state not found")
+	DefaultStateStorage StateStorage
+)
 
 type InstanceStatus string
 
