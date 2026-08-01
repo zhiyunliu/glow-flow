@@ -1,0 +1,236 @@
+{
+  "context_envelope": {
+    "meta": {
+      "plan_id": "20260801-redis-lua-refactor",
+      "created_at": "2026-08-01T00:00:00+08:00",
+      "last_updated": "2026-08-01T00:00:00+08:00",
+      "version": "1"
+    },
+    "tech_stack": [
+      {
+        "name": "Go",
+        "version": "1.26",
+        "usage_context": "Library module github.com/zhiyunliu/glow-flow",
+        "config_files": ["go.mod"]
+      },
+      {
+        "name": "github.com/redis/go-redis/v9",
+        "version": "v9.21.0",
+        "usage_context": "Redis client used by defaults.NewRedisStorage and Redis script execution",
+        "config_files": ["go.mod"]
+      },
+      {
+        "name": "github.com/alicebob/miniredis/v2",
+        "version": "v2.38.0",
+        "usage_context": "Existing Redis-compatible test server for defaults Redis storage tests",
+        "config_files": ["go.mod"]
+      },
+      {
+        "name": "embed",
+        "version": "standard-library",
+        "usage_context": "Required for embedding standalone Lua script files into defaults package",
+        "config_files": ["defaults/state.storeage.redis.go"]
+      }
+    ],
+    "conventions": [
+      "Public interfaces and state models live in root package glowflow; default adapters live in defaults package.",
+      "Keep existing misspelled state.storeage filenames stable unless explicitly asked to rename them.",
+      "Tests in defaults package use miniredis, direct struct literals, reflect.DeepEqual, and t.Fatalf assertions.",
+      "Current Redis adapter constructor is NewRedisStorage(client *redis.Client) glowflow.StateStorage.",
+      "Use TDD: add failing Redis Lua/NOSCRIPT tests before editing production Redis storage code."
+    ],
+    "constraints": {
+      "hard": [
+        "Do not implement code during planning phase.",
+        "Use apply_patch for later file edits.",
+        "Do not revert unrelated user or formatter changes.",
+        "Do not change StateStorage interface.",
+        "Do not wire StateStorage into Engine.",
+        "Replace Pipeline and TxPipeline usage in defaults/state.storeage.redis.go with embedded Lua scripts.",
+        "Move private helpers in defaults/state.storeage.redis.go onto redisStorage as methods.",
+        "Lua execution must reload and retry when Redis reports missing script cache."
+      ],
+      "soft": [
+        "Keep changes scoped to defaults/state.storeage.redis.go, defaults/state.storeage.redis_test.go, defaults Lua assets, and go.mod/go.sum only if needed.",
+        "Preserve deterministic list ordering by sorting IDs before filtering and pagination.",
+        "Run go mod tidy only if a dependency changes."
+      ],
+      "compatibility": [
+        "Missing state errors must preserve errors.Is compatibility with glowflow.ErrStateNotFound.",
+        "JSON round trips must preserve exported state fields used by existing tests.",
+        "NewRedisStorage public signature and return contract must remain stable."
+      ],
+      "security_requirements": [
+        "Do not log Redis credentials or connection strings.",
+        "Do not add dynamic Lua generation from user data; pass keys and args through Redis script APIs."
+      ]
+    },
+    "architecture_snapshot": {
+      "key_dirs": [".", "defaults", "docs/plan"],
+      "patterns": [
+        "Root package defines contracts; defaults package provides optional adapter implementations.",
+        "Redis adapter currently uses direct Redis commands for get/list and TxPipeline for save/delete.",
+        "List methods read index sets, sort IDs, fetch individual records, filter in Go, then paginate.",
+        "StateStorage is currently adapter-level; Engine integration is intentionally out of scope."
+      ],
+      "key_components": [
+        {
+          "name": "StateStorage contract",
+          "location": "state.storeage.go",
+          "responsibility": [
+            "Declare instance and node state structs, statuses, filters, and ErrStateNotFound.",
+            "Require CRUD/list methods for instance and node runtime state."
+          ]
+        },
+        {
+          "name": "Redis storage adapter",
+          "location": "defaults/state.storeage.redis.go",
+          "responsibility": [
+            "Accept a go-redis client and satisfy glowflow.StateStorage.",
+            "Persist JSON state records and maintain Redis set indexes for list operations.",
+            "Own private key, ID, filter, pagination, and Lua script execution helpers after refactor."
+          ]
+        },
+        {
+          "name": "Redis storage tests",
+          "location": "defaults/state.storeage.redis_test.go",
+          "responsibility": [
+            "Validate instance and node CRUD/list contracts with miniredis.",
+            "Add Lua script missing-cache reload coverage before production changes."
+          ]
+        }
+      ]
+    },
+    "research_digest": {
+      "relevant_files": [
+        {
+          "path": "defaults/state.storeage.redis.go",
+          "purpose": [
+            "Primary target file for helper methodization, embedded Lua setup, and pipeline replacement.",
+            "Contains TxPipeline calls in SaveInstanceState, DeleteInstanceState, SaveNodeState, and DeleteNodeState.",
+            "Contains private helpers instanceStateKey, nodeStateKey, nodeStateID, status-set builders, and pagination helpers."
+          ],
+          "confidence": 0.99
+        },
+        {
+          "path": "defaults/state.storeage.redis_test.go",
+          "purpose": [
+            "Existing Redis storage contract tests for instance and node behavior.",
+            "Best place to add TDD coverage for Lua and NOSCRIPT reload behavior."
+          ],
+          "confidence": 0.98
+        },
+        {
+          "path": "state.storeage.go",
+          "purpose": [
+            "Defines StateStorage interface and filters that must not change.",
+            "Defines ErrStateNotFound compatibility requirement."
+          ],
+          "confidence": 0.98
+        },
+        {
+          "path": "go.mod",
+          "purpose": [
+            "Confirms Go 1.26, go-redis/v9 v9.21.0, and miniredis/v2 v2.38.0 are already present.",
+            "Should change only if execution needs a new test helper."
+          ],
+          "confidence": 0.95
+        },
+        {
+          "path": "docs/plan/20260801-complete-redis-state-storage/context_envelope.json",
+          "purpose": [
+            "Reusable context confirming Redis adapter is standalone and Engine wiring is out of scope.",
+            "Some details may be stale because current Redis implementation and tests already exist."
+          ],
+          "confidence": 0.7
+        }
+      ],
+      "patterns_found": [
+        {
+          "name": "Redis set index plus JSON records",
+          "category": "storage",
+          "confidence": 0.95,
+          "example_location": ["defaults/state.storeage.redis.go"]
+        },
+        {
+          "name": "Deterministic list by sorted IDs",
+          "category": "testing-contract",
+          "confidence": 0.92,
+          "example_location": ["defaults/state.storeage.redis.go", "defaults/state.storeage.redis_test.go"]
+        },
+        {
+          "name": "Package-local miniredis tests",
+          "category": "testing",
+          "confidence": 0.9,
+          "example_location": ["defaults/state.storeage.redis_test.go"]
+        }
+      ],
+      "gotchas": [
+        {
+          "text": "User wording says redisStoreage, but code type is redisStorage; preserve current concrete type spelling.",
+          "confidence": 0.98
+        },
+        {
+          "text": "miniredis script-cache behavior must be verified; fallback test strategy may need real Redis or command-level error injection.",
+          "confidence": 0.82
+        },
+        {
+          "text": "Moving all private helpers onto redisStorage may include pure helpers; execution should avoid package-level private helpers in the target file unless justified.",
+          "confidence": 0.9
+        },
+        {
+          "text": "NOSCRIPT matching should recognize Redis missing-script errors without swallowing unrelated script failures.",
+          "confidence": 0.9
+        },
+        {
+          "text": "Lua assets must be committed as standalone files; go:embed fails at compile time if the pattern or files are missing.",
+          "confidence": 0.94
+        }
+      ]
+    },
+    "prior_decisions": [
+      {
+        "decision": "Treat the refactor as a standalone defaults Redis adapter change.",
+        "rationale": [
+          "Objective targets defaults/state.storeage.redis.go.",
+          "Planning scope explicitly excludes StateStorage interface and Engine wiring."
+        ],
+        "confidence": 0.96
+      },
+      {
+        "decision": "Add tests first for Lua/NOSCRIPT behavior before changing implementation.",
+        "rationale": [
+          "User context requires TDD.",
+          "Existing tests cover baseline behavior but not script cache reload."
+        ],
+        "confidence": 0.95
+      },
+      {
+        "decision": "Use embedded standalone Lua files for atomic save/delete operations.",
+        "rationale": [
+          "User explicitly requested independent Lua files loaded with embed.",
+          "Only current pipeline sites are write/delete operations needing atomic multi-command behavior."
+        ],
+        "confidence": 0.94
+      },
+      {
+        "decision": "Move private helpers to redisStorage object methods without changing public API.",
+        "rationale": [
+          "User explicitly requested private helpers become object methods.",
+          "All helper functions are private to defaults/state.storeage.redis.go."
+        ],
+        "confidence": 0.92
+      }
+    ],
+    "reuse_notes": [
+      {
+        "path": "docs/plan/20260801-complete-redis-state-storage/context_envelope.json",
+        "trust": "low"
+      },
+      {
+        "path": "/memories/repo/d_default_node_factory_nil.md",
+        "trust": "high"
+      }
+    ]
+  }
+}

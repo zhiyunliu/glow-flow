@@ -1,0 +1,222 @@
+plan_id: 20260801-redis-lua-refactor
+objective: Refactor defaults/state.storeage.redis.go private helpers into redisStorage methods, replace Redis pipelines with embedded Lua scripts, and retry after script loss.
+created_at: "2026-08-01T00:00:00+08:00"
+created_by: gem-planner
+status: pending
+tldr: |
+  Refactor the Redis StateStorage adapter without changing the public storage contract.
+  Add focused tests first, embed standalone Lua scripts, execute them through a reload-aware helper, then replace TxPipeline writes/deletes.
+plan_metrics:
+  wave_1_task_count: 1
+  total_dependencies: 3
+  risk_score: medium
+quality_warnings:
+  - NOSCRIPT behavior needs an explicit test because miniredis may not mimic every Redis error shape.
+  - The repository uses the misspelled state.storeage filename; keep filenames stable unless execution proves otherwise.
+  - Lua assets must stay package-local and embedded at compile time so go test ./... catches missing files.
+assumptions:
+  - The current private helper functions in defaults/state.storeage.redis.go should become methods on redisStorage.
+  - The concrete type is redisStorage, not redisStoreage; preserve the existing spelling.
+  - Save and delete operations are the only current Pipeline users and should be converted to Lua.
+  - Get and list behavior can keep normal Redis commands unless execution discovers a pipeline there.
+  - Missing states must continue to satisfy errors.Is(err, glowflow.ErrStateNotFound).
+  - StateStorage interface, Engine wiring, and root package state models are out of scope.
+tasks:
+  - id: T1-redis-lua-contract-tests
+    title: Define Lua-backed Redis storage tests
+    description: Add failing tests that pin Lua write/delete behavior and missing-script retry before production changes.
+    wave: 1
+    agent: gem-implementer
+    status: pending
+    covers:
+      - AC1: Redis storage contract still passes for instance state CRUD, list, filters, pagination, and missing errors.
+      - AC2: Redis storage contract still passes for node state CRUD, list, filters, pagination, and missing errors.
+      - AC3: Lua-backed save/delete paths recover from Redis script cache loss by reloading and retrying once.
+      - AC4: Tests fail before implementation because current code uses TxPipeline and has no script reload path.
+    dependencies: []
+    conflicts_with: []
+    context_files:
+      - path: defaults/state.storeage.redis_test.go
+        description: Existing miniredis-backed contract tests for Redis StateStorage behavior.
+      - path: defaults/state.storeage.redis.go
+        description: Current Redis adapter with TxPipeline usage and private file-level helpers.
+      - path: state.storeage.go
+        description: Public StateStorage interface, state structs, filters, and ErrStateNotFound contract.
+      - path: go.mod
+        description: Confirms go-redis/v9 and miniredis are already available.
+    flags:
+      flaky: false
+      retries_used: 0
+      requires_design_validation: false
+    acceptance_criteria:
+      - Add focused tests under defaults/state.storeage.redis_test.go before changing production code.
+      - Cover instance save/delete through Lua by observing Redis key and index set changes through public storage methods.
+      - Cover node save/delete through Lua by observing Redis key and index set changes through public storage methods.
+      - Cover NOSCRIPT or missing script cache behavior by forcing the script cache to be absent and proving the next save/delete succeeds.
+      - Preserve existing errors.Is checks for glowflow.ErrStateNotFound after deletes and absent keys.
+      - Keep tests package-local; add dependencies only if miniredis cannot express the needed Redis script-cache scenario.
+    success_criteria:
+      - go test ./defaults -run RedisStorage fails for the expected missing Lua or script reload behavior before production changes.
+    tech_stack:
+      - Go 1.26
+      - github.com/redis/go-redis/v9 v9.21.0
+      - github.com/alicebob/miniredis/v2 v2.38.0
+    test_coverage: Focus on public StateStorage behavior plus one explicit missing-script reload scenario.
+    diag: null
+    handoff:
+      do_not_reinvestigate:
+        - StateStorage interface is defined in state.storeage.go and must not change.
+        - Engine integration is outside this task.
+        - Existing Redis contract tests already cover basic CRUD/list behavior.
+      required_test_first: Add reload-focused failing tests and run go test ./defaults -run RedisStorage.
+      target_files:
+        - defaults/state.storeage.redis_test.go
+        - go.mod
+        - go.sum
+      minimal_change: Add tests only; no production or Lua asset changes in this task.
+      acceptance_checks:
+        - go test ./defaults -run RedisStorage
+  - id: T2-redis-lua-assets-and-runner
+    title: Add embedded Lua scripts and reload-aware runner
+    description: Introduce package-local Lua script assets and a redisStorage method that loads, executes, reloads on NOSCRIPT, and retries once.
+    wave: 2
+    agent: gem-implementer
+    status: pending
+    covers:
+      - AC3: Lua execution handles missing script cache by reloading and retrying.
+      - AC5: Lua scripts live in independent .lua files and are embedded into Go code.
+    dependencies:
+      - T1-redis-lua-contract-tests
+    conflicts_with: []
+    context_files:
+      - path: defaults/state.storeage.redis.go
+        description: Target for embed setup and redisStorage script execution method.
+      - path: defaults/state.storeage.redis_test.go
+        description: T1 reload tests define the observable behavior for missing script handling.
+    flags:
+      flaky: false
+      retries_used: 0
+      requires_design_validation: false
+    acceptance_criteria:
+      - Create separate Lua files under defaults for each atomic write/delete operation or a clearly grouped equivalent.
+      - Embed Lua files using Go embed from defaults/state.storeage.redis.go.
+      - Add redisStorage methods for script key construction, loading, execution, and NOSCRIPT retry handling.
+      - Retry script execution only after confirming a missing-script condition; do not mask unrelated Redis or Lua errors.
+      - Keep the runner private to redisStorage and avoid package-level helper functions for new behavior.
+    success_criteria:
+      - go test ./defaults -run RedisStorageMissingScript or the equivalent focused reload test passes.
+      - get_errors reports no relevant diagnostics in defaults/state.storeage.redis.go.
+    tech_stack:
+      - Go 1.26
+      - embed
+      - github.com/redis/go-redis/v9 v9.21.0
+    test_coverage: T1 reload test is the gate; existing CRUD tests may still fail until T3 replaces all pipelines.
+    diag: null
+    handoff:
+      do_not_reinvestigate:
+        - Pipeline replacement sites are SaveInstanceState, DeleteInstanceState, SaveNodeState, and DeleteNodeState.
+        - Existing helper names are private and can move to redisStorage methods without API impact.
+      required_test_first: Start from the failing T1 reload test output.
+      target_files:
+        - defaults/state.storeage.redis.go
+        - defaults/*.lua
+      minimal_change: Add embedded Lua assets and a private redisStorage runner without changing StateStorage signatures.
+      acceptance_checks:
+        - go test ./defaults -run RedisStorage
+        - get_errors for defaults/state.storeage.redis.go
+  - id: T3-replace-pipelines-and-methodize-helpers
+    title: Replace pipelines and move helpers onto redisStorage
+    description: Convert all remaining TxPipeline operations to embedded Lua scripts and make private helpers redisStorage methods.
+    wave: 3
+    agent: gem-implementer
+    status: pending
+    covers:
+      - AC1: Instance state save/delete/list behavior remains correct.
+      - AC2: Node state save/delete/list behavior remains correct.
+      - AC5: No Redis Pipeline or TxPipeline usage remains in defaults/state.storeage.redis.go.
+      - AC6: Private helper functions in the file are redisStorage object methods.
+    dependencies:
+      - T2-redis-lua-assets-and-runner
+    conflicts_with: []
+    context_files:
+      - path: defaults/state.storeage.redis.go
+        description: Owns all Redis adapter behavior and all private helper functions to methodize.
+      - path: defaults/state.storeage.redis_test.go
+        description: Public contract tests and reload tests that must pass after conversion.
+      - path: state.storeage.go
+        description: Interface and state/filter shapes that must remain stable.
+    flags:
+      flaky: false
+      retries_used: 0
+      requires_design_validation: false
+    acceptance_criteria:
+      - Remove all Pipeline and TxPipeline usage from defaults/state.storeage.redis.go.
+      - SaveInstanceState uses Lua to set the instance state key and add the instance ID to the index atomically.
+      - DeleteInstanceState uses Lua to delete the instance state key and remove the instance ID from the index atomically.
+      - SaveNodeState uses Lua to set the node state key and add the composite node ID to the index atomically.
+      - DeleteNodeState uses Lua to delete the node state key and remove the composite node ID from the index atomically.
+      - Convert instanceStateKey, nodeStateKey, nodeStateID, status-set builders, and pagination helpers to redisStorage methods or justify any exception in the task notes.
+      - Preserve deterministic list ordering and all existing filter semantics.
+      - Do not change NewRedisStorage return type, StateStorage interface, or Engine wiring.
+    success_criteria:
+      - go test ./defaults -run RedisStorage passes.
+      - grep finds no Pipeline or TxPipeline reference in defaults/state.storeage.redis.go.
+      - get_errors reports no relevant diagnostics in touched Go files.
+    tech_stack:
+      - Go 1.26
+      - embed
+      - github.com/redis/go-redis/v9 v9.21.0
+    test_coverage: Full RedisStorage test set validates behavior after the refactor.
+    diag: null
+    handoff:
+      do_not_reinvestigate:
+        - The helper-method request applies only to private helpers in defaults/state.storeage.redis.go.
+        - Public test helper functions in defaults/state.storeage.redis_test.go are outside the production helper request.
+      required_test_first: Do not broaden beyond the T1 tests; use them as the executable contract.
+      target_files:
+        - defaults/state.storeage.redis.go
+        - defaults/*.lua
+      minimal_change: Keep behavior equivalent while changing helper ownership and write/delete execution mechanism.
+      acceptance_checks:
+        - go test ./defaults -run RedisStorage
+        - grep -n "Pipeline\|TxPipeline" defaults/state.storeage.redis.go
+        - get_errors for defaults/state.storeage.redis.go and defaults/state.storeage.redis_test.go
+  - id: T4-final-validation-and-review
+    title: Validate and review Redis Lua refactor
+    description: Run focused and repository-level checks, then review scope, behavior, and risk before handoff.
+    wave: 4
+    agent: gem-reviewer
+    status: pending
+    covers:
+      - AC7: Repository validation succeeds after the refactor.
+      - AC8: Final diff is scoped to Redis adapter, tests, Lua assets, and dependency metadata only if needed.
+    dependencies:
+      - T3-replace-pipelines-and-methodize-helpers
+    conflicts_with: []
+    context_files:
+      - path: defaults/state.storeage.redis.go
+        description: Final Redis adapter implementation under review.
+      - path: defaults/state.storeage.redis_test.go
+        description: Final Redis tests under review.
+      - path: defaults/*.lua
+        description: Embedded Lua scripts used by save/delete operations.
+      - path: go.mod
+        description: Dependency metadata should be unchanged unless tests required a new helper.
+    flags:
+      flaky: false
+      retries_used: 0
+      requires_design_validation: false
+    acceptance_criteria:
+      - go test ./defaults -run RedisStorage exits 0.
+      - go test ./... exits 0.
+      - go vet ./... exits 0.
+      - go list ./... exits 0.
+      - get_errors reports no relevant diagnostics in touched files.
+      - Review confirms no public API, Engine wiring, or unrelated file rename changes were introduced.
+      - Review confirms embedded Lua files are present and referenced by go:embed.
+      - Review confirms NOSCRIPT handling reloads and retries without swallowing non-NOSCRIPT errors.
+    success_criteria:
+      - Final reviewer finds no unresolved contract, reload, or scope gaps.
+    requires_review: true
+    review_depth: lightweight
+    review_security_sensitive: false

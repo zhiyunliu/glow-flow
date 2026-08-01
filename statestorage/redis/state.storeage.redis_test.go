@@ -1,9 +1,11 @@
-package defaults
+package redis
 
 import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -101,6 +103,43 @@ func TestRedisStorageInstanceStateContract(t *testing.T) {
 	}
 }
 
+func TestRedisStorageInstanceStateUsesLuaAndReloadsMissingScript(t *testing.T) {
+	ctx := context.Background()
+	storage, client, commands := newObservedTestRedisStorage(t)
+	state := glowflow.InstanceState{
+		InstanceID: "inst-lua",
+		ChainID:    "flow-lua",
+		Version:    "v1",
+		Status:     glowflow.InstanceStatusRunning,
+		CreatedAt:  time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC),
+		UpdatedAt:  time.Date(2026, 8, 1, 12, 1, 0, 0, time.UTC),
+	}
+
+	commands.Reset()
+	if err := storage.SaveInstanceState(ctx, state); err != nil {
+		t.Fatalf("save instance state with lua script: %v", err)
+	}
+	commands.RequireLuaExecution(t, "initial instance save")
+
+	if err := client.ScriptFlush(ctx).Err(); err != nil {
+		t.Fatalf("flush script cache: %v", err)
+	}
+
+	commands.Reset()
+	state.Status = glowflow.InstanceStatusCompleted
+	state.UpdatedAt = state.UpdatedAt.Add(time.Minute)
+	if err := storage.SaveInstanceState(ctx, state); err != nil {
+		t.Fatalf("save instance state after script flush: %v", err)
+	}
+	commands.RequireScriptReload(t, "instance save after script flush")
+
+	commands.Reset()
+	if err := storage.DeleteInstanceState(ctx, state.InstanceID); err != nil {
+		t.Fatalf("delete instance state after script flush: %v", err)
+	}
+	commands.RequireLuaExecution(t, "instance delete")
+}
+
 func TestRedisStorageNodeStateContract(t *testing.T) {
 	ctx := context.Background()
 	storage := newTestRedisStorage(t)
@@ -190,6 +229,44 @@ func TestRedisStorageNodeStateContract(t *testing.T) {
 	}
 }
 
+func TestRedisStorageNodeStateUsesLuaAndReloadsMissingScript(t *testing.T) {
+	ctx := context.Background()
+	storage, client, commands := newObservedTestRedisStorage(t)
+	state := glowflow.NodeState{
+		InstanceID: "inst-lua",
+		ChainID:    "flow-lua",
+		Version:    "v1",
+		NodeID:     "node-lua",
+		Status:     glowflow.NodeStatusRunning,
+		Attempts:   1,
+		Input:      map[string]any{"payload": "in"},
+	}
+
+	commands.Reset()
+	if err := storage.SaveNodeState(ctx, state); err != nil {
+		t.Fatalf("save node state with lua script: %v", err)
+	}
+	commands.RequireLuaExecution(t, "initial node save")
+
+	if err := client.ScriptFlush(ctx).Err(); err != nil {
+		t.Fatalf("flush script cache: %v", err)
+	}
+
+	commands.Reset()
+	state.Status = glowflow.NodeStatusCompleted
+	state.Output = map[string]any{"payload": "out"}
+	if err := storage.SaveNodeState(ctx, state); err != nil {
+		t.Fatalf("save node state after script flush: %v", err)
+	}
+	commands.RequireScriptReload(t, "node save after script flush")
+
+	commands.Reset()
+	if err := storage.DeleteNodeState(ctx, state.InstanceID, state.NodeID); err != nil {
+		t.Fatalf("delete node state after script flush: %v", err)
+	}
+	commands.RequireLuaExecution(t, "node delete")
+}
+
 func newTestRedisStorage(t *testing.T) glowflow.StateStorage {
 	t.Helper()
 
@@ -200,6 +277,103 @@ func newTestRedisStorage(t *testing.T) glowflow.StateStorage {
 	})
 
 	return NewRedisStorage(client)
+}
+
+func newObservedTestRedisStorage(t *testing.T) (glowflow.StateStorage, *redis.Client, *redisCommandLog) {
+	t.Helper()
+
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	commands := &redisCommandLog{}
+	client.AddHook(commands)
+	t.Cleanup(func() {
+		_ = client.Close()
+	})
+
+	return NewRedisStorage(client), client, commands
+}
+
+type redisCommandLog struct {
+	mu       sync.Mutex
+	commands []string
+}
+
+func (l *redisCommandLog) DialHook(next redis.DialHook) redis.DialHook {
+	return next
+}
+
+func (l *redisCommandLog) ProcessHook(next redis.ProcessHook) redis.ProcessHook {
+	return func(ctx context.Context, cmd redis.Cmder) error {
+		l.record(cmd.Name())
+		return next(ctx, cmd)
+	}
+}
+
+func (l *redisCommandLog) ProcessPipelineHook(next redis.ProcessPipelineHook) redis.ProcessPipelineHook {
+	return func(ctx context.Context, cmds []redis.Cmder) error {
+		for _, cmd := range cmds {
+			l.record(cmd.Name())
+		}
+		return next(ctx, cmds)
+	}
+}
+
+func (l *redisCommandLog) Reset() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.commands = nil
+}
+
+func (l *redisCommandLog) RequireLuaExecution(t *testing.T, operation string) {
+	t.Helper()
+
+	if !l.hasAny("eval", "evalsha", "script") {
+		t.Fatalf("%s commands = %#v, want lua script execution", operation, l.snapshot())
+	}
+}
+
+func (l *redisCommandLog) RequireScriptReload(t *testing.T, operation string) {
+	t.Helper()
+
+	if !l.has("evalsha") || !l.hasAny("eval", "script") {
+		t.Fatalf("%s commands = %#v, want evalsha plus eval fallback or script reload", operation, l.snapshot())
+	}
+}
+
+func (l *redisCommandLog) record(name string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.commands = append(l.commands, strings.ToLower(name))
+}
+
+func (l *redisCommandLog) has(name string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for _, command := range l.commands {
+		if command == name {
+			return true
+		}
+	}
+	return false
+}
+
+func (l *redisCommandLog) hasAny(names ...string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for _, command := range l.commands {
+		for _, name := range names {
+			if command == name {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (l *redisCommandLog) snapshot() []string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return append([]string(nil), l.commands...)
 }
 
 func instanceStateIDs(states []glowflow.InstanceState) []string {

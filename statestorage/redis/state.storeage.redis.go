@@ -1,7 +1,8 @@
-package defaults
+package redis
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +18,25 @@ const (
 	redisNodeIndexKey     = "glowflow:state:nodes"
 )
 
+//go:embed save_instance_state.lua
+var redisSaveInstanceLua string
+
+//go:embed delete_instance_state.lua
+var redisDeleteInstanceLua string
+
+//go:embed save_node_state.lua
+var redisSaveNodeLua string
+
+//go:embed delete_node_state.lua
+var redisDeleteNodeLua string
+
+var (
+	redisSaveInstanceScript   = redis.NewScript(redisSaveInstanceLua)
+	redisDeleteInstanceScript = redis.NewScript(redisDeleteInstanceLua)
+	redisSaveNodeScript       = redis.NewScript(redisSaveNodeLua)
+	redisDeleteNodeScript     = redis.NewScript(redisDeleteNodeLua)
+)
+
 type redisStorage struct {
 	redis *redis.Client
 }
@@ -30,16 +50,13 @@ func (s *redisStorage) SaveInstanceState(ctx context.Context, state glowflow.Ins
 	if err != nil {
 		return err
 	}
-	key := instanceStateKey(state.InstanceID)
-	pipe := s.redis.TxPipeline()
-	pipe.Set(ctx, key, data, 0)
-	pipe.SAdd(ctx, redisInstanceIndexKey, state.InstanceID)
-	_, err = pipe.Exec(ctx)
+	key := s.instanceStateKey(state.InstanceID)
+	_, err = s.runRedisScript(ctx, redisSaveInstanceScript, []string{key, redisInstanceIndexKey}, data, state.InstanceID)
 	return err
 }
 
 func (s *redisStorage) GetInstanceState(ctx context.Context, instanceID string) (glowflow.InstanceState, error) {
-	data, err := s.redis.Get(ctx, instanceStateKey(instanceID)).Bytes()
+	data, err := s.redis.Get(ctx, s.instanceStateKey(instanceID)).Bytes()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
 			return glowflow.InstanceState{}, fmt.Errorf("instance state %q: %w", instanceID, glowflow.ErrStateNotFound)
@@ -61,7 +78,7 @@ func (s *redisStorage) ListInstanceStates(ctx context.Context, filter glowflow.I
 	}
 	sort.Strings(ids)
 
-	statuses := instanceStatusSet(filter.Statuses)
+	statuses := s.instanceStatusSet(filter.Statuses)
 	states := make([]glowflow.InstanceState, 0, len(ids))
 	for _, id := range ids {
 		state, err := s.GetInstanceState(ctx, id)
@@ -82,14 +99,11 @@ func (s *redisStorage) ListInstanceStates(ctx context.Context, filter glowflow.I
 		}
 		states = append(states, state)
 	}
-	return paginateInstances(states, filter.Offset, filter.Limit), nil
+	return s.paginateInstances(states, filter.Offset, filter.Limit), nil
 }
 
 func (s *redisStorage) DeleteInstanceState(ctx context.Context, instanceID string) error {
-	pipe := s.redis.TxPipeline()
-	pipe.Del(ctx, instanceStateKey(instanceID))
-	pipe.SRem(ctx, redisInstanceIndexKey, instanceID)
-	_, err := pipe.Exec(ctx)
+	_, err := s.runRedisScript(ctx, redisDeleteInstanceScript, []string{s.instanceStateKey(instanceID), redisInstanceIndexKey}, instanceID)
 	return err
 }
 
@@ -98,16 +112,13 @@ func (s *redisStorage) SaveNodeState(ctx context.Context, state glowflow.NodeSta
 	if err != nil {
 		return err
 	}
-	id := nodeStateID(state.InstanceID, state.NodeID)
-	pipe := s.redis.TxPipeline()
-	pipe.Set(ctx, nodeStateKey(state.InstanceID, state.NodeID), data, 0)
-	pipe.SAdd(ctx, redisNodeIndexKey, id)
-	_, err = pipe.Exec(ctx)
+	id := s.nodeStateID(state.InstanceID, state.NodeID)
+	_, err = s.runRedisScript(ctx, redisSaveNodeScript, []string{s.nodeStateKey(state.InstanceID, state.NodeID), redisNodeIndexKey}, data, id)
 	return err
 }
 
 func (s *redisStorage) GetNodeState(ctx context.Context, instanceID string, nodeID string) (glowflow.NodeState, error) {
-	data, err := s.redis.Get(ctx, nodeStateKey(instanceID, nodeID)).Bytes()
+	data, err := s.redis.Get(ctx, s.nodeStateKey(instanceID, nodeID)).Bytes()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
 			return glowflow.NodeState{}, fmt.Errorf("node state %q/%q: %w", instanceID, nodeID, glowflow.ErrStateNotFound)
@@ -129,7 +140,7 @@ func (s *redisStorage) ListNodeStates(ctx context.Context, filter glowflow.NodeS
 	}
 	sort.Strings(ids)
 
-	statuses := nodeStatusSet(filter.Statuses)
+	statuses := s.nodeStatusSet(filter.Statuses)
 	states := make([]glowflow.NodeState, 0, len(ids))
 	for _, id := range ids {
 		instanceID, nodeID, ok := strings.Cut(id, "/")
@@ -157,30 +168,38 @@ func (s *redisStorage) ListNodeStates(ctx context.Context, filter glowflow.NodeS
 		}
 		states = append(states, state)
 	}
-	return paginateNodes(states, filter.Offset, filter.Limit), nil
+	return s.paginateNodes(states, filter.Offset, filter.Limit), nil
 }
 
 func (s *redisStorage) DeleteNodeState(ctx context.Context, instanceID string, nodeID string) error {
-	pipe := s.redis.TxPipeline()
-	pipe.Del(ctx, nodeStateKey(instanceID, nodeID))
-	pipe.SRem(ctx, redisNodeIndexKey, nodeStateID(instanceID, nodeID))
-	_, err := pipe.Exec(ctx)
+	_, err := s.runRedisScript(ctx, redisDeleteNodeScript, []string{s.nodeStateKey(instanceID, nodeID), redisNodeIndexKey}, s.nodeStateID(instanceID, nodeID))
 	return err
 }
 
-func instanceStateKey(instanceID string) string {
+func (s *redisStorage) runRedisScript(ctx context.Context, script *redis.Script, keys []string, args ...any) (any, error) {
+	cmd := script.EvalSha(ctx, s.redis, keys, args...)
+	if !redis.HasErrorPrefix(cmd.Err(), "NOSCRIPT") {
+		return cmd.Result()
+	}
+	if err := script.Load(ctx, s.redis).Err(); err != nil {
+		return nil, err
+	}
+	return script.EvalSha(ctx, s.redis, keys, args...).Result()
+}
+
+func (s *redisStorage) instanceStateKey(instanceID string) string {
 	return "glowflow:state:instance:" + instanceID
 }
 
-func nodeStateKey(instanceID string, nodeID string) string {
-	return "glowflow:state:node:" + nodeStateID(instanceID, nodeID)
+func (s *redisStorage) nodeStateKey(instanceID string, nodeID string) string {
+	return "glowflow:state:node:" + s.nodeStateID(instanceID, nodeID)
 }
 
-func nodeStateID(instanceID string, nodeID string) string {
+func (s *redisStorage) nodeStateID(instanceID string, nodeID string) string {
 	return instanceID + "/" + nodeID
 }
 
-func instanceStatusSet(statuses []glowflow.InstanceStatus) map[glowflow.InstanceStatus]bool {
+func (s *redisStorage) instanceStatusSet(statuses []glowflow.InstanceStatus) map[glowflow.InstanceStatus]bool {
 	set := make(map[glowflow.InstanceStatus]bool, len(statuses))
 	for _, status := range statuses {
 		set[status] = true
@@ -188,7 +207,7 @@ func instanceStatusSet(statuses []glowflow.InstanceStatus) map[glowflow.Instance
 	return set
 }
 
-func nodeStatusSet(statuses []glowflow.NodeStatus) map[glowflow.NodeStatus]bool {
+func (s *redisStorage) nodeStatusSet(statuses []glowflow.NodeStatus) map[glowflow.NodeStatus]bool {
 	set := make(map[glowflow.NodeStatus]bool, len(statuses))
 	for _, status := range statuses {
 		set[status] = true
@@ -196,7 +215,7 @@ func nodeStatusSet(statuses []glowflow.NodeStatus) map[glowflow.NodeStatus]bool 
 	return set
 }
 
-func paginateInstances(states []glowflow.InstanceState, offset int, limit int) []glowflow.InstanceState {
+func (s *redisStorage) paginateInstances(states []glowflow.InstanceState, offset int, limit int) []glowflow.InstanceState {
 	if offset < 0 {
 		offset = 0
 	}
@@ -210,7 +229,7 @@ func paginateInstances(states []glowflow.InstanceState, offset int, limit int) [
 	return states
 }
 
-func paginateNodes(states []glowflow.NodeState, offset int, limit int) []glowflow.NodeState {
+func (s *redisStorage) paginateNodes(states []glowflow.NodeState, offset int, limit int) []glowflow.NodeState {
 	if offset < 0 {
 		offset = 0
 	}
