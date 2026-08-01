@@ -31,7 +31,7 @@ const (
 
 type InstanceState struct {
 	InstanceID     string         `json:"instance_id"`
-	FlowID         string         `json:"flow_id"`
+	ChainID        string         `json:"chain_id"`
 	Version        string         `json:"version"`
 	Status         InstanceStatus `json:"status"`
 	CurrentNodeIDs []string       `json:"current_node_ids,omitempty"`
@@ -44,7 +44,7 @@ type InstanceState struct {
 
 type NodeState struct {
 	InstanceID string         `json:"instance_id"`
-	FlowID     string         `json:"flow_id"`
+	ChainID    string         `json:"chain_id"`
 	Version    string         `json:"version"`
 	NodeID     string         `json:"node_id"`
 	Status     NodeStatus     `json:"status"`
@@ -58,7 +58,7 @@ type NodeState struct {
 }
 
 type InstanceStateFilter struct {
-	FlowID   string
+	ChainID  string
 	Version  string
 	Statuses []InstanceStatus
 	Limit    int
@@ -67,7 +67,7 @@ type InstanceStateFilter struct {
 
 type NodeStateFilter struct {
 	InstanceID string
-	FlowID     string
+	ChainID    string
 	NodeID     string
 	Statuses   []NodeStatus
 	Limit      int

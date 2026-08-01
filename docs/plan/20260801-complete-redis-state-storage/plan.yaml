@@ -1,0 +1,163 @@
+plan_id: 20260801-complete-redis-state-storage
+objective: Complete implementation of defaults/state.storeage.redis.go in glow-flow
+created_at: "2026-08-01T00:00:00+08:00"
+created_by: gem-planner
+status: pending
+tldr: |
+  Add durable Redis-backed StateStorage for instance and node runtime state.
+  Drive behavior through TDD before production changes, then validate with focused and full Go tests.
+plan_metrics:
+  wave_1_task_count: 1
+  total_dependencies: 2
+  risk_score: medium
+quality_warnings:
+  - Redis list behavior needs an explicit test contract for filtering, ordering, limit, and offset.
+  - No current engine path calls StateStorage; implementation can be validated as a standalone default adapter.
+assumptions:
+  - Redis storage should satisfy glowflow.StateStorage without changing the interface.
+  - Missing instance or node state should return glowflow.ErrStateNotFound.
+  - List results should be deterministic; tests should define ordering before implementation.
+  - Existing go-redis/v9 dependency remains the Redis client dependency.
+  - Tests may add a lightweight Redis test helper dependency if needed, followed by go mod tidy.
+tasks:
+  - id: T1-state-storage-contract-tests
+    title: Define Redis StateStorage contract tests
+    description: Add failing tests that pin Redis-backed instance and node state behavior before implementation.
+    wave: 1
+    agent: gem-implementer
+    status: pending
+    covers:
+      - AC1: Instance state can be saved, read, listed, and deleted through Redis storage.
+      - AC2: Node state can be saved, read, listed, and deleted through Redis storage.
+      - AC3: Missing records map to glowflow.ErrStateNotFound.
+      - AC4: List filters, limit, offset, and deterministic ordering are specified by tests.
+    dependencies: []
+    conflicts_with: []
+    context_files:
+      - path: state.storeage.go
+        description: Owns StateStorage, state structs, filters, and ErrStateNotFound.
+      - path: defaults/state.storeage.redis.go
+        description: Target Redis storage constructor and implementation type.
+      - path: go.mod
+        description: Already depends on github.com/redis/go-redis/v9.
+    flags:
+      flaky: false
+      retries_used: 0
+      requires_design_validation: false
+    acceptance_criteria:
+      - Tests exercise NewRedisStorage with a Redis-compatible client.
+      - Tests cover SaveInstanceState, GetInstanceState, ListInstanceStates, and DeleteInstanceState.
+      - Tests cover SaveNodeState, GetNodeState, ListNodeStates, and DeleteNodeState.
+      - Tests assert errors.Is(err, glowflow.ErrStateNotFound) after deletion and for absent keys.
+      - Tests define list filtering for FlowID, Version, InstanceID, NodeID, Statuses, Limit, and Offset.
+      - The first narrow test run fails because redisStorage lacks StateStorage methods or behavior.
+    success_criteria:
+      - go test ./defaults -run RedisStorage fails for the expected missing implementation reason before T2.
+    tech_stack:
+      - Go 1.26
+      - github.com/redis/go-redis/v9
+    test_coverage: New defaults package tests should pin public StateStorage behavior without engine coupling.
+    diag: null
+    handoff:
+      do_not_reinvestigate:
+        - Engine currently accepts WithStateStorage but does not call it.
+        - The StateStorage interface is complete in state.storeage.go.
+        - go.mod already has go-redis/v9 v9.21.0.
+      required_test_first: Add RedisStorage tests before any production change and run go test ./defaults -run RedisStorage.
+      target_files:
+        - defaults/state.storeage.redis_test.go
+        - go.mod
+        - go.sum
+      minimal_change: Add only tests and any needed test dependency; do not edit production code in this task.
+      acceptance_checks:
+        - go test ./defaults -run RedisStorage
+  - id: T2-redis-state-storage-implementation
+    title: Implement Redis StateStorage adapter
+    description: Complete redisStorage so the T1 contract passes for instance and node state persistence.
+    wave: 2
+    agent: gem-implementer
+    status: pending
+    covers:
+      - AC1: Instance state CRUD/list works through Redis.
+      - AC2: Node state CRUD/list works through Redis.
+      - AC3: Missing records return glowflow.ErrStateNotFound.
+      - AC5: Constructor behavior is safe for invalid client input if tests require it.
+    dependencies:
+      - T1-state-storage-contract-tests
+    conflicts_with: []
+    context_files:
+      - path: defaults/state.storeage.redis.go
+        description: Owns Redis-backed glowflow.StateStorage implementation.
+      - path: state.storeage.go
+        description: Defines required methods and JSON-serializable state shapes.
+      - path: defaults/state.storeage.redis_test.go
+        description: Contract from T1; implementation should satisfy these tests.
+    flags:
+      flaky: false
+      retries_used: 0
+      requires_design_validation: false
+    acceptance_criteria:
+      - redisStorage has all StateStorage methods with context-aware Redis calls.
+      - Saved states preserve all exported JSON fields including maps, any values, timestamps, and pointer timestamps.
+      - Delete operations remove records and remove them from list results.
+      - Get operations wrap or return glowflow.ErrStateNotFound so errors.Is works.
+      - List operations honor filters and pagination exactly as T1 defines.
+      - Implementation remains contained to defaults package unless dependency metadata needs tidy updates.
+    success_criteria:
+      - go test ./defaults -run RedisStorage passes.
+      - go test ./... passes after go mod tidy if dependencies changed.
+    tech_stack:
+      - Go 1.26
+      - github.com/redis/go-redis/v9
+    test_coverage: T1 tests are the behavior gate; full suite checks repository integration.
+    diag: null
+    handoff:
+      do_not_reinvestigate:
+        - Do not wire storage into Engine dispatch in this plan.
+        - Do not rename misspelled state.storeage filenames in this plan.
+        - Do not change StateStorage interface unless tests expose a hard mismatch.
+      required_test_first: Use the failing T1 tests as the starting point; no production code before red is confirmed.
+      target_files:
+        - defaults/state.storeage.redis.go
+        - go.mod
+        - go.sum
+      minimal_change: Implement the existing adapter behind NewRedisStorage with private helpers only where needed.
+      acceptance_checks:
+        - go test ./defaults -run RedisStorage
+        - go test ./...
+        - get_errors for defaults/state.storeage.redis.go and defaults/state.storeage.redis_test.go
+  - id: T3-validation-and-review
+    title: Validate Redis storage completion
+    description: Review final diff and run repository checks for contract, dependency, and diagnostics correctness.
+    wave: 3
+    agent: gem-reviewer
+    status: pending
+    covers:
+      - AC6: Final implementation is tested and scoped to Redis storage.
+    dependencies:
+      - T2-redis-state-storage-implementation
+    conflicts_with: []
+    context_files:
+      - path: defaults/state.storeage.redis.go
+        description: Final Redis storage implementation under review.
+      - path: defaults/state.storeage.redis_test.go
+        description: Final Redis storage contract tests under review.
+      - path: state.storeage.go
+        description: Interface conformance source of truth.
+      - path: go.mod
+        description: Dependency metadata after implementation.
+    flags:
+      flaky: false
+      retries_used: 0
+      requires_design_validation: false
+    acceptance_criteria:
+      - go test ./defaults -run RedisStorage exits 0.
+      - go test ./... exits 0.
+      - go list ./... exits 0.
+      - Diagnostics show no relevant syntax or type errors in touched Go files.
+      - Review confirms no unrelated engine wiring, file renames, or public interface changes were introduced.
+    success_criteria:
+      - Reviewer finds no contract gaps for CRUD, missing-state errors, list filters, and pagination.
+    requires_review: true
+    review_depth: lightweight
+    review_security_sensitive: false

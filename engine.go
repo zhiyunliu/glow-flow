@@ -9,16 +9,16 @@ import (
 
 type Engine struct {
 	options *options
-	flows   cmap.ConcurrentMap[string, *flowSeries]
+	chains  cmap.ConcurrentMap[string, *chainSeries]
 }
 
-type flowSeries struct {
-	versions      map[string]*flowRuntime
+type chainSeries struct {
+	versions      map[string]*chainRuntime
 	latestVersion string
 	paused        bool
 }
 
-type flowRuntime struct {
+type chainRuntime struct {
 	definition ChainDefinition
 	compiled   *CompiledChain
 }
@@ -27,7 +27,7 @@ type flowRuntime struct {
 func NewEngine(opts ...Option) *Engine {
 	engine := &Engine{
 		options: &options{},
-		flows:   cmap.New[*flowSeries](),
+		chains:  cmap.New[*chainSeries](),
 	}
 	for _, opt := range opts {
 		opt(engine.options)
@@ -58,18 +58,18 @@ func (e *Engine) Run() error {
 	return nil
 }
 
-func (e *Engine) Dispatch(flowID string, data any) (string, error) {
-	series, ok := e.flows.Get(flowID)
+func (e *Engine) Dispatch(chainID string, data any) (string, error) {
+	series, ok := e.chains.Get(chainID)
 	if !ok {
-		return "", fmt.Errorf("flow not loaded: %s", flowID)
+		return "", fmt.Errorf("flow not loaded: %s", chainID)
 	}
 	if series.paused {
-		return "", fmt.Errorf("flow paused: %s", flowID)
+		return "", fmt.Errorf("flow paused: %s", chainID)
 	}
 	version := series.latestVersion
 	flow, ok := series.versions[version]
 	if !ok {
-		return "", fmt.Errorf("flow version not loaded: %s@%s", flowID, version)
+		return "", fmt.Errorf("flow version not loaded: %s@%s", chainID, version)
 	}
 	compiled := flow.compiled
 
@@ -90,20 +90,20 @@ func (e *Engine) Stop() error {
 	return nil
 }
 
-func (e *Engine) Pause(flowID string) error {
+func (e *Engine) Pause(chainID string) error {
 
-	flow, ok := e.flows.Get(flowID)
+	flow, ok := e.chains.Get(chainID)
 	if !ok {
-		return fmt.Errorf("flow not loaded: %s", flowID)
+		return fmt.Errorf("chain not loaded: %s", chainID)
 	}
 	flow.paused = true
 	return nil
 }
 
-func (e *Engine) Resume(flowID string) error {
-	flow, ok := e.flows.Get(flowID)
+func (e *Engine) Resume(chainID string) error {
+	flow, ok := e.chains.Get(chainID)
 	if !ok {
-		return fmt.Errorf("flow not loaded: %s", flowID)
+		return fmt.Errorf("chain not loaded: %s", chainID)
 	}
 	flow.paused = false
 	return nil
@@ -115,21 +115,21 @@ func (e *Engine) Reload(def ChainDefinition) error {
 
 func (e *Engine) loadLocked(def ChainDefinition) error {
 	if def.ID == "" {
-		return fmt.Errorf("flow id is empty")
+		return fmt.Errorf("chain id is empty")
 	}
 	if def.Version == "" {
-		return fmt.Errorf("flow version is empty")
+		return fmt.Errorf("chain version is empty")
 	}
 	compiled, err := e.options.compiler.Compile(def, e.options.registry)
 	if err != nil {
 		return err
 	}
-	series, ok := e.flows.Get(def.ID)
+	series, ok := e.chains.Get(def.ID)
 	if !ok {
-		series = &flowSeries{versions: make(map[string]*flowRuntime)}
-		e.flows.Set(def.ID, series)
+		series = &chainSeries{versions: make(map[string]*chainRuntime)}
+		e.chains.Set(def.ID, series)
 	}
-	series.versions[def.Version] = &flowRuntime{definition: def, compiled: compiled}
+	series.versions[def.Version] = &chainRuntime{definition: def, compiled: compiled}
 	series.latestVersion = def.Version
 	return nil
 }

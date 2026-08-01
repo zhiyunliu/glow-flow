@@ -1,0 +1,197 @@
+{
+  "context_envelope": {
+    "meta": {
+      "plan_id": "20260801-complete-redis-state-storage",
+      "created_at": "2026-08-01T00:00:00+08:00",
+      "last_updated": "2026-08-01T00:00:00+08:00",
+      "version": "1"
+    },
+    "tech_stack": [
+      {
+        "name": "Go",
+        "version": "1.26",
+        "usage_context": "Library module github.com/zhiyunliu/glow-flow",
+        "config_files": ["go.mod"]
+      },
+      {
+        "name": "github.com/redis/go-redis/v9",
+        "version": "v9.21.0",
+        "usage_context": "Redis client accepted by defaults.NewRedisStorage",
+        "config_files": ["go.mod"]
+      }
+    ],
+    "conventions": [
+      "Public interfaces live in root package glowflow; default adapters live in defaults package.",
+      "Tests are package-local Go tests using direct struct literals and t.Fatalf assertions.",
+      "Implementation should preserve current misspelled state.storeage filenames unless explicitly renamed.",
+      "Use TDD: add failing RedisStorage tests before editing production adapter code."
+    ],
+    "constraints": {
+      "hard": [
+        "Do not implement code during planning phase.",
+        "Use apply_patch for later file edits.",
+        "Do not revert unrelated user or formatter changes.",
+        "Do not change StateStorage interface unless execution discovers a hard mismatch.",
+        "Do not wire StateStorage into Engine dispatch in this Redis adapter plan."
+      ],
+      "soft": [
+        "Keep implementation contained to defaults/state.storeage.redis.go and focused tests where possible.",
+        "Prefer deterministic list semantics so tests do not depend on Redis scan order.",
+        "Run go mod tidy only if dependencies change."
+      ],
+      "compatibility": [
+        "NewRedisStorage currently accepts *redis.Client and returns glowflow.StateStorage.",
+        "Missing states should preserve errors.Is compatibility with glowflow.ErrStateNotFound."
+      ],
+      "security_requirements": [
+        "Do not log Redis credentials or connection URLs in tests or errors."
+      ]
+    },
+    "architecture_snapshot": {
+      "key_dirs": [".", "defaults", "docs/plan"],
+      "patterns": [
+        "Root package defines interfaces, options, engine, compiler, dispatcher, and state models.",
+        "defaults package currently contains adapter skeletons rather than engine-integrated behavior.",
+        "StateStorage is unused by Engine today; Redis adapter can be tested through the interface directly."
+      ],
+      "key_components": [
+        {
+          "name": "StateStorage contract",
+          "location": "state.storeage.go",
+          "responsibility": [
+            "Declare InstanceState, NodeState, filters, statuses, ErrStateNotFound.",
+            "Require CRUD/list methods for instance and node runtime state."
+          ]
+        },
+        {
+          "name": "Redis storage adapter",
+          "location": "defaults/state.storeage.redis.go",
+          "responsibility": [
+            "Accept go-redis client.",
+            "Return a value satisfying glowflow.StateStorage."
+          ]
+        },
+        {
+          "name": "Engine options",
+          "location": "options.go",
+          "responsibility": [
+            "Store optional StateStorage through WithStateStorage.",
+            "Does not currently drive persistence behavior."
+          ]
+        }
+      ]
+    },
+    "research_digest": {
+      "relevant_files": [
+        {
+          "path": "state.storeage.go",
+          "purpose": [
+            "Primary contract for Redis adapter.",
+            "Defines ErrStateNotFound and list filters."
+          ],
+          "confidence": 0.98
+        },
+        {
+          "path": "defaults/state.storeage.redis.go",
+          "purpose": [
+            "Only current Redis storage implementation surface.",
+            "Contains redisStorage with *redis.Client field and NewRedisStorage constructor."
+          ],
+          "confidence": 0.98
+        },
+        {
+          "path": "go.mod",
+          "purpose": [
+            "Confirms go 1.26 and go-redis/v9 v9.21.0 are already present.",
+            "Will record any test helper dependency if added."
+          ],
+          "confidence": 0.95
+        },
+        {
+          "path": "options.go",
+          "purpose": [
+            "Shows WithStateStorage only stores the adapter on options.",
+            "Confirms engine integration is outside current Redis adapter scope."
+          ],
+          "confidence": 0.9
+        },
+        {
+          "path": "engine.go",
+          "purpose": [
+            "Confirms Engine does not currently call StateStorage during Dispatch, Load, or Reload.",
+            "Prevents accidental expansion into runtime persistence wiring."
+          ],
+          "confidence": 0.88
+        }
+      ],
+      "patterns_found": [
+        {
+          "name": "Interface plus defaults adapter",
+          "category": "architecture",
+          "confidence": 0.92,
+          "example_location": ["state.storeage.go", "defaults/state.storeage.redis.go"]
+        },
+        {
+          "name": "Package-local Go tests",
+          "category": "testing",
+          "confidence": 0.85,
+          "example_location": ["engine_test.go", "dispatcher_test.go"]
+        }
+      ],
+      "gotchas": [
+        {
+          "text": "There is no existing in-memory StateStorage implementation to mirror.",
+          "confidence": 0.88
+        },
+        {
+          "text": "Redis SCAN/order is not deterministic; tests should define stable list order independent of raw scan order.",
+          "confidence": 0.86
+        },
+        {
+          "text": "State structs contain any fields; JSON round trip may decode numbers/maps with standard encoding/json shapes.",
+          "confidence": 0.82
+        },
+        {
+          "text": "Engine stateStorage option is present but unused; wiring it would expand scope beyond completing Redis adapter.",
+          "confidence": 0.9
+        }
+      ]
+    },
+    "prior_decisions": [
+      {
+        "decision": "Plan Redis adapter as standalone StateStorage implementation.",
+        "rationale": [
+          "User targeted defaults/state.storeage.redis.go.",
+          "Engine currently does not call StateStorage, so adapter contract is the narrow implementation boundary."
+        ],
+        "confidence": 0.9
+      },
+      {
+        "decision": "Use TDD with RedisStorage contract tests before production code.",
+        "rationale": [
+          "User explicitly requested TDD in task context.",
+          "List filtering and missing-state behavior need tests to prevent ambiguous implementation."
+        ],
+        "confidence": 0.94
+      },
+      {
+        "decision": "Avoid renaming state.storeage files in this plan.",
+        "rationale": [
+          "Filename typo is existing repository shape.",
+          "Renaming would add churn unrelated to completing Redis storage behavior."
+        ],
+        "confidence": 0.86
+      }
+    ],
+    "reuse_notes": [
+      {
+        "path": "/memories/repo/d_default_node_factory_nil.md",
+        "trust": "high"
+      },
+      {
+        "path": "docs/plan/20260801-flow-to-chain-definitions/context_envelope.json",
+        "trust": "low"
+      }
+    ]
+  }
+}
