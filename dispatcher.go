@@ -8,38 +8,32 @@ import (
 )
 
 type Dispatcher interface {
-	Dispatch(ctx Context, flow *CompiledFlow, data any) (instanceID string, err error)
+	Dispatch(ctx Context, flow *CompiledFlow, data any) (err error)
 }
 
-type dispatcher struct {
-	asnycGroup errgroup.Group
-}
+type dispatcher struct{}
 
 func NewDispatcher() Dispatcher {
 	return &dispatcher{}
 }
 
-func (d *dispatcher) Dispatch(ctx Context, flow *CompiledFlow, data any) (string, error) {
+func (d *dispatcher) Dispatch(ctx Context, flow *CompiledFlow, data any) error {
 	if ctx == nil {
-		return "", fmt.Errorf("context is nil")
+		return fmt.Errorf("context is nil")
 	}
 	if flow == nil {
-		return "", fmt.Errorf("compiled flow is nil")
+		return fmt.Errorf("compiled flow is nil")
 	}
-	instanceID, err := newInstanceID()
-	if err != nil {
-		return "", err
-	}
-	ctx.Set("instance_id", instanceID)
+	var asyncGroup errgroup.Group
 
 	for _, node := range flow.StartNodes {
-		d.asnycGroup.Go(d.asyncCall(ctx, flow, node, data))
+		asyncGroup.Go(d.asyncCall(&asyncGroup, ctx, flow, node, data))
 	}
 
-	return instanceID, nil
+	return asyncGroup.Wait()
 }
 
-func (d *dispatcher) dispatchNode(ctx Context, flow *CompiledFlow, node CompiledNode, data any) error {
+func (d *dispatcher) dispatchNode(asyncGroup *errgroup.Group, ctx Context, flow *CompiledFlow, node CompiledNode, data any) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -53,14 +47,14 @@ func (d *dispatcher) dispatchNode(ctx Context, flow *CompiledFlow, node Compiled
 
 	nextNodes := flow.NextNodes(node.Id(), result.RelationType)
 	for _, nextNode := range nextNodes {
-		d.asnycGroup.Go(d.asyncCall(ctx, flow, nextNode, result.Data))
+		asyncGroup.Go(d.asyncCall(asyncGroup, ctx, flow, nextNode, result.Data))
 	}
 	return nil
 }
 
-func (d *dispatcher) asyncCall(ctx Context, flow *CompiledFlow, node CompiledNode, data any) func() error {
+func (d *dispatcher) asyncCall(asyncGroup *errgroup.Group, ctx Context, flow *CompiledFlow, node CompiledNode, data any) func() error {
 	return func() error {
-		return d.dispatchNode(ctx, flow, node, data)
+		return d.dispatchNode(asyncGroup, ctx, flow, node, data)
 	}
 }
 

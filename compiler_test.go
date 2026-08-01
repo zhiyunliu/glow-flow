@@ -2,14 +2,12 @@ package glowflow
 
 import (
 	"testing"
-
-	"github.com/zhiyunliu/glow-flow/nodetype"
 )
 
 type testNode struct {
 	id      string
 	name    string
-	nodeTyp nodetype.NodeType
+	nodeTyp string
 	start   bool
 	config  any
 	pos     Position
@@ -18,7 +16,7 @@ type testNode struct {
 
 func (n *testNode) Id() string                                           { return n.id }
 func (n *testNode) Name() string                                         { return n.name }
-func (n *testNode) Type() nodetype.NodeType                              { return n.nodeTyp }
+func (n *testNode) Type() string                                         { return n.nodeTyp }
 func (n *testNode) IsStartNode() bool                                    { return n.start }
 func (n *testNode) Config() any                                          { return n.config }
 func (n *testNode) Position() Position                                   { return n.pos }
@@ -28,7 +26,7 @@ func (n *testNode) NextNodes() []CompiledNode                            { retur
 func TestFlowCompilerBuildsRelationGraph(t *testing.T) {
 	registry := NewRegistry()
 	err := registry.Register(NodeDescriptor{
-		Type: nodetype.StartNode,
+		Type: "start",
 		Factory: func(def NodeDefinition) (CompiledNode, error) {
 			return &testNode{id: def.ID, name: def.Name, nodeTyp: def.Type, start: true, config: def.ExtParams}, nil
 		},
@@ -37,7 +35,7 @@ func TestFlowCompilerBuildsRelationGraph(t *testing.T) {
 		t.Fatalf("register start node: %v", err)
 	}
 	err = registry.Register(NodeDescriptor{
-		Type: nodetype.TaskNode,
+		Type: "task",
 		Factory: func(def NodeDefinition) (CompiledNode, error) {
 			return &testNode{id: def.ID, name: def.Name, nodeTyp: def.Type, config: def.ExtParams}, nil
 		},
@@ -50,9 +48,9 @@ func TestFlowCompilerBuildsRelationGraph(t *testing.T) {
 		ID:      "flow-a",
 		Version: "v1",
 		Nodes: []NodeDefinition{
-			{ID: "start", Name: "start", Type: nodetype.StartNode},
-			{ID: "true-node", Name: "true", Type: nodetype.TaskNode},
-			{ID: "false-node", Name: "false", Type: nodetype.TaskNode},
+			{ID: "start", Name: "start", Type: "start"},
+			{ID: "true-node", Name: "true", Type: "task"},
+			{ID: "false-node", Name: "false", Type: "task"},
 		},
 		Connections: []ConnectionDefinition{
 			{FromID: "start", ToID: "true-node", Type: "True"},
@@ -84,7 +82,7 @@ func TestFlowCompilerRejectsUnknownNodeType(t *testing.T) {
 		ID:      "flow-a",
 		Version: "v1",
 		Nodes: []NodeDefinition{
-			{ID: "start", Name: "start", Type: nodetype.StartNode},
+			{ID: "start", Name: "start", Type: "start"},
 		},
 	}, NewRegistry())
 	if err == nil {

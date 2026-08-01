@@ -3,18 +3,17 @@ package glowflow
 import (
 	"context"
 	"testing"
-
-	"github.com/zhiyunliu/glow-flow/nodetype"
 )
 
 func TestEngineDispatchesLoadedFlowWithData(t *testing.T) {
 	registry := NewRegistry()
 	executed := make(map[string]int)
 	inputs := make(map[string][]any)
+	instances := make(map[string][]string)
 	err := registry.Register(NodeDescriptor{
-		Type: nodetype.StartNode,
+		Type: "start",
 		Factory: func(def NodeDefinition) (CompiledNode, error) {
-			return &recordingEngineNode{id: def.ID, nodeType: def.Type, start: true, executed: executed, inputs: inputs}, nil
+			return &recordingEngineNode{id: def.ID, nodeType: def.Type, start: true, executed: executed, inputs: inputs, instances: instances}, nil
 		},
 	})
 	if err != nil {
@@ -23,8 +22,8 @@ func TestEngineDispatchesLoadedFlowWithData(t *testing.T) {
 
 	engine := NewEngine(WithRegistry(registry))
 	err = engine.Load(
-		FlowDefinition{ID: "flow-a", Version: "v1", Nodes: []NodeDefinition{{ID: "start-a", Type: nodetype.StartNode}}},
-		FlowDefinition{ID: "flow-b", Version: "v1", Nodes: []NodeDefinition{{ID: "start-b", Type: nodetype.StartNode}}},
+		FlowDefinition{ID: "flow-a", Version: "v1", Nodes: []NodeDefinition{{ID: "start-a", Type: "start"}}},
+		FlowDefinition{ID: "flow-b", Version: "v1", Nodes: []NodeDefinition{{ID: "start-b", Type: "start"}}},
 	)
 	if err != nil {
 		t.Fatalf("load flows: %v", err)
@@ -51,13 +50,36 @@ func TestEngineDispatchesLoadedFlowWithData(t *testing.T) {
 	if len(inputs["start-a"]) != 1 || inputs["start-a"][0] != "payload-a" {
 		t.Fatalf("start-a inputs = %#v, want payload-a", inputs["start-a"])
 	}
+	if len(instances["start-a"]) != 1 || instances["start-a"][0] != instanceID {
+		t.Fatalf("start-a instances = %#v, want %q", instances["start-a"], instanceID)
+	}
+
+	secondInstanceID, err := engine.Dispatch("flow-a", "payload-b")
+	if err != nil {
+		t.Fatalf("dispatch flow-a second time: %v", err)
+	}
+	if secondInstanceID == "" {
+		t.Fatal("dispatch flow-a second instanceID is empty")
+	}
+	if secondInstanceID == instanceID {
+		t.Fatalf("dispatch flow-a instanceIDs = %q and %q, want different", instanceID, secondInstanceID)
+	}
+	if executed["start-a"] != 2 || executed["start-b"] != 0 {
+		t.Fatalf("executed after second dispatch = %#v, want only flow-a twice", executed)
+	}
+	if len(inputs["start-a"]) != 2 || inputs["start-a"][1] != "payload-b" {
+		t.Fatalf("start-a inputs after second dispatch = %#v, want payload-a then payload-b", inputs["start-a"])
+	}
+	if len(instances["start-a"]) != 2 || instances["start-a"][1] != secondInstanceID {
+		t.Fatalf("start-a instances after second dispatch = %#v, want returned instance IDs", instances["start-a"])
+	}
 }
 
 func TestEnginePauseResumeFlow(t *testing.T) {
 	registry := NewRegistry()
 	executed := make(map[string]int)
 	err := registry.Register(NodeDescriptor{
-		Type: nodetype.StartNode,
+		Type: "start",
 		Factory: func(def NodeDefinition) (CompiledNode, error) {
 			return &recordingEngineNode{id: def.ID, nodeType: def.Type, start: true, executed: executed}, nil
 		},
@@ -68,8 +90,8 @@ func TestEnginePauseResumeFlow(t *testing.T) {
 
 	engine := NewEngine(WithRegistry(registry))
 	err = engine.Load(
-		FlowDefinition{ID: "flow-a", Version: "v1", Nodes: []NodeDefinition{{ID: "start-a", Type: nodetype.StartNode}}},
-		FlowDefinition{ID: "flow-b", Version: "v1", Nodes: []NodeDefinition{{ID: "start-b", Type: nodetype.StartNode}}},
+		FlowDefinition{ID: "flow-a", Version: "v1", Nodes: []NodeDefinition{{ID: "start-a", Type: "start"}}},
+		FlowDefinition{ID: "flow-b", Version: "v1", Nodes: []NodeDefinition{{ID: "start-b", Type: "start"}}},
 	)
 	if err != nil {
 		t.Fatalf("load flows: %v", err)
@@ -101,7 +123,7 @@ func TestEngineKeepsVersionsAndDispatchesLatestByFlowID(t *testing.T) {
 	registry := NewRegistry()
 	executed := make(map[string]int)
 	err := registry.Register(NodeDescriptor{
-		Type: nodetype.StartNode,
+		Type: "start",
 		Factory: func(def NodeDefinition) (CompiledNode, error) {
 			return &recordingEngineNode{id: def.ID, nodeType: def.Type, start: true, executed: executed}, nil
 		},
@@ -111,11 +133,11 @@ func TestEngineKeepsVersionsAndDispatchesLatestByFlowID(t *testing.T) {
 	}
 
 	engine := NewEngine(WithRegistry(registry))
-	err = engine.Load(FlowDefinition{ID: "flow-a", Version: "v1", Nodes: []NodeDefinition{{ID: "start-v1", Type: nodetype.StartNode}}})
+	err = engine.Load(FlowDefinition{ID: "flow-a", Version: "v1", Nodes: []NodeDefinition{{ID: "start-v1", Type: "start"}}})
 	if err != nil {
 		t.Fatalf("load flow: %v", err)
 	}
-	err = engine.Reload(FlowDefinition{ID: "flow-a", Version: "v2", Nodes: []NodeDefinition{{ID: "start-v2", Type: nodetype.StartNode}}})
+	err = engine.Reload(FlowDefinition{ID: "flow-a", Version: "v2", Nodes: []NodeDefinition{{ID: "start-v2", Type: "start"}}})
 	if err != nil {
 		t.Fatalf("reload flow: %v", err)
 	}
@@ -132,30 +154,39 @@ func TestEngineKeepsVersionsAndDispatchesLatestByFlowID(t *testing.T) {
 }
 
 type recordingEngineNode struct {
-	id       string
-	nodeType nodetype.NodeType
-	start    bool
-	executed map[string]int
-	inputs   map[string][]any
+	id        string
+	nodeType  string
+	start     bool
+	executed  map[string]int
+	inputs    map[string][]any
+	instances map[string][]string
 }
 
-func (n *recordingEngineNode) Id() string              { return n.id }
-func (n *recordingEngineNode) Name() string            { return n.id }
-func (n *recordingEngineNode) Type() nodetype.NodeType { return n.nodeType }
-func (n *recordingEngineNode) IsStartNode() bool       { return n.start }
-func (n *recordingEngineNode) Config() any             { return nil }
-func (n *recordingEngineNode) Position() Position      { return Position{} }
+func (n *recordingEngineNode) Id() string         { return n.id }
+func (n *recordingEngineNode) Name() string       { return n.id }
+func (n *recordingEngineNode) Type() string       { return n.nodeType }
+func (n *recordingEngineNode) IsStartNode() bool  { return n.start }
+func (n *recordingEngineNode) Config() any        { return nil }
+func (n *recordingEngineNode) Position() Position { return Position{} }
 func (n *recordingEngineNode) Execute(ctx Context, data any) (ExecuteResult, error) {
 	n.executed[n.id]++
 	if n.inputs != nil {
 		n.inputs[n.id] = append(n.inputs[n.id], data)
+	}
+	if n.instances != nil {
+		n.instances[n.id] = append(n.instances[n.id], ctx.GetInstanceID())
 	}
 	return ExecuteResult{Data: data}, nil
 }
 func (n *recordingEngineNode) NextNodes() []CompiledNode { return nil }
 
 func TestEngineRunUsesBackgroundContext(t *testing.T) {
-	ctx := NewContext(context.Background())
+
+	instanceID, err := newInstanceID()
+	if err != nil {
+		t.Fatalf("new instanceID: %v", err)
+	}
+	ctx := NewContext(context.Background(), instanceID)
 	if ctx.Err() != nil {
 		t.Fatalf("new context err = %v, want nil", ctx.Err())
 	}

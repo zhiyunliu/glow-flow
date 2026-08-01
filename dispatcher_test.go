@@ -3,28 +3,28 @@ package glowflow
 import (
 	"context"
 	"testing"
-
-	"github.com/zhiyunliu/glow-flow/nodetype"
 )
 
 type recordingNode struct {
 	id        string
 	name      string
-	nodeType  nodetype.NodeType
+	nodeType  string
 	start     bool
 	inputs    []any
+	instances []string
 	result    ExecuteResult
 	execError error
 }
 
-func (n *recordingNode) Id() string              { return n.id }
-func (n *recordingNode) Name() string            { return n.name }
-func (n *recordingNode) Type() nodetype.NodeType { return n.nodeType }
-func (n *recordingNode) IsStartNode() bool       { return n.start }
-func (n *recordingNode) Config() any             { return nil }
-func (n *recordingNode) Position() Position      { return Position{} }
+func (n *recordingNode) Id() string         { return n.id }
+func (n *recordingNode) Name() string       { return n.name }
+func (n *recordingNode) Type() string       { return n.nodeType }
+func (n *recordingNode) IsStartNode() bool  { return n.start }
+func (n *recordingNode) Config() any        { return nil }
+func (n *recordingNode) Position() Position { return Position{} }
 func (n *recordingNode) Execute(ctx Context, data any) (ExecuteResult, error) {
 	n.inputs = append(n.inputs, data)
+	n.instances = append(n.instances, ctx.GetInstanceID())
 	return n.result, n.execError
 }
 func (n *recordingNode) NextNodes() []CompiledNode { return nil }
@@ -33,15 +33,15 @@ func TestDispatcherRoutesByRelationType(t *testing.T) {
 	start := &recordingNode{
 		id:       "start",
 		name:     "start",
-		nodeType: nodetype.StartNode,
+		nodeType: "start",
 		start:    true,
 		result: ExecuteResult{
 			RelationType: "True",
 			Data:         "payload-for-next",
 		},
 	}
-	trueNode := &recordingNode{id: "true-node", name: "true", nodeType: nodetype.TaskNode}
-	falseNode := &recordingNode{id: "false-node", name: "false", nodeType: nodetype.TaskNode}
+	trueNode := &recordingNode{id: "true-node", name: "true", nodeType: "task"}
+	falseNode := &recordingNode{id: "false-node", name: "false", nodeType: "task"}
 	flow := &CompiledFlow{
 		Nodes: map[string]CompiledNode{
 			"start":      start,
@@ -57,12 +57,9 @@ func TestDispatcherRoutesByRelationType(t *testing.T) {
 		StartNodes: []CompiledNode{start},
 	}
 
-	instanceID, err := NewDispatcher().Dispatch(NewContext(context.Background()), flow, "input")
+	err := NewDispatcher().Dispatch(NewContext(context.Background(), "instance-1"), flow, "input")
 	if err != nil {
 		t.Fatalf("dispatch: %v", err)
-	}
-	if instanceID == "" {
-		t.Fatal("dispatch instanceID is empty")
 	}
 
 	if len(start.inputs) != 1 || start.inputs[0] != "input" {
@@ -80,14 +77,14 @@ func TestDispatcherUsesDefaultRelationFallback(t *testing.T) {
 	start := &recordingNode{
 		id:       "start",
 		name:     "start",
-		nodeType: nodetype.StartNode,
+		nodeType: "start",
 		start:    true,
 		result: ExecuteResult{
 			RelationType: "unknown",
 			Data:         42,
 		},
 	}
-	defaultNode := &recordingNode{id: "default-node", name: "default", nodeType: nodetype.TaskNode}
+	defaultNode := &recordingNode{id: "default-node", name: "default", nodeType: "task"}
 	flow := &CompiledFlow{
 		Nodes: map[string]CompiledNode{
 			"start":        start,
@@ -101,12 +98,9 @@ func TestDispatcherUsesDefaultRelationFallback(t *testing.T) {
 		StartNodes: []CompiledNode{start},
 	}
 
-	instanceID, err := NewDispatcher().Dispatch(NewContext(context.Background()), flow, "input")
+	err := NewDispatcher().Dispatch(NewContext(context.Background(), "instance-1"), flow, "input")
 	if err != nil {
 		t.Fatalf("dispatch: %v", err)
-	}
-	if instanceID == "" {
-		t.Fatal("dispatch instanceID is empty")
 	}
 	if len(defaultNode.inputs) != 1 || defaultNode.inputs[0] != 42 {
 		t.Fatalf("default node inputs = %#v, want 42", defaultNode.inputs)
@@ -114,23 +108,25 @@ func TestDispatcherUsesDefaultRelationFallback(t *testing.T) {
 }
 
 func TestDispatcherReturnsDifferentInstanceIDPerDispatch(t *testing.T) {
-	start := &recordingNode{id: "start", name: "start", nodeType: nodetype.StartNode, start: true}
+	start := &recordingNode{id: "start", name: "start", nodeType: "start", start: true}
 	flow := &CompiledFlow{StartNodes: []CompiledNode{start}}
 	dispatcher := NewDispatcher()
 
-	firstID, err := dispatcher.Dispatch(NewContext(context.Background()), flow, "first")
+	err := dispatcher.Dispatch(NewContext(context.Background(), "instance-1"), flow, "first")
 	if err != nil {
 		t.Fatalf("dispatch first: %v", err)
 	}
-	secondID, err := dispatcher.Dispatch(NewContext(context.Background()), flow, "second")
+	err = dispatcher.Dispatch(NewContext(context.Background(), "instance-2"), flow, "second")
 	if err != nil {
 		t.Fatalf("dispatch second: %v", err)
 	}
-
-	if firstID == "" || secondID == "" {
-		t.Fatalf("instanceIDs = %q, %q, want non-empty", firstID, secondID)
+	if len(start.instances) != 2 {
+		t.Fatalf("start instances = %#v, want two dispatches", start.instances)
 	}
-	if firstID == secondID {
-		t.Fatalf("instanceIDs = %q and %q, want different", firstID, secondID)
+	if start.instances[0] != "instance-1" || start.instances[1] != "instance-2" {
+		t.Fatalf("start instances = %#v, want instance-1 then instance-2", start.instances)
+	}
+	if start.instances[0] == start.instances[1] {
+		t.Fatalf("start instances = %#v, want different instance IDs", start.instances)
 	}
 }

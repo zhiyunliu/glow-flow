@@ -1,0 +1,174 @@
+plan_id: 20260801-remove-nodetype-nodetype
+objective: Remove all project usages of nodetype.NodeType and replace them with string
+created_at: "2026-08-01T00:00:00Z"
+created_by: gem-planner
+status: pending
+tldr: |
+  Refactor public node type surfaces from nodetype.NodeType to string, then update tests/docs and verify no project usage remains.
+
+plan_metrics:
+  wave_1_task_count: 1
+  total_dependencies: 2
+  risk_score: medium
+quality_warnings:
+  - Public Go interfaces change; downstream consumers may need compatibility notes.
+
+open_questions: []
+assumptions:
+  - NodeDefinition.Type is already string and remains the source type used by compiler input.
+  - Package nodetype should not be deleted unless execution confirms it is unused after migration.
+  - Existing string values start, task, and end must remain unchanged.
+
+prior_decisions:
+  - NodeDefinition.Type should stay string; this plan continues that previous migration decision.
+
+tasks:
+  - id: T1-registry-node-api-string
+    title: Convert registry and node APIs to string
+    description: Change direct nodetype.NodeType public and internal type surfaces to string where behavior is owned.
+    wave: 1
+    agent: gem-implementer
+    status: pending
+    covers:
+      - Registry descriptors, lookup keys, and node interface return type use string.
+      - Compiler lookup no longer casts NodeDefinition.Type through nodetype.NodeType.
+    dependencies: []
+    conflicts_with: []
+    context_files:
+      - path: registry.go
+        description: Owns NodeDescriptor.Type, Registry.Get, and node map key types.
+      - path: node.go
+        description: Owns Node.Type return type in the public node interface.
+      - path: compiler.go
+        description: Calls Registry.Get with NodeDefinition.Type during flow compilation.
+      - path: define.go
+        description: Confirms NodeDefinition.Type is already string.
+    flags:
+      flaky: false
+      retries_used: 0
+      requires_design_validation: false
+    acceptance_criteria:
+      - AC1: No production Go code references nodetype.NodeType.
+      - AC2: Registry behavior and duplicate or empty type validation remain unchanged.
+      - AC3: Flow compiler still rejects unknown node type strings with existing error behavior.
+    success_criteria:
+      - go test ./... passes after this and dependent tasks complete.
+      - A workspace grep for nodetype.NodeType returns no production-code matches.
+    tech_stack:
+      - Go 1.26
+    test_coverage: Existing compiler and registry-adjacent tests cover lookup and validation behavior.
+    diag: null
+    handoff:
+      do_not_reinvestigate:
+        - NodeDefinition.Type already read as string in define.go.
+        - Registry currently stores map[nodetype.NodeType]NodeDescriptor and should store map[string]NodeDescriptor.
+      required_test_first: Run or inspect existing compiler tests that cover unknown node type and successful graph build.
+      target_files:
+        - registry.go
+        - node.go
+        - compiler.go
+      minimal_change: Replace nodetype.NodeType API surfaces with string and remove imports made unused by that change.
+      acceptance_checks:
+        - go test ./...
+        - grep confirms no nodetype.NodeType in non-doc code.
+
+  - id: T2-tests-fixtures-string
+    title: Update tests and fixtures to string node types
+    description: Align test helper structs, Type methods, descriptors, and node definitions with string-based node types.
+    wave: 2
+    agent: gem-implementer
+    status: pending
+    covers:
+      - Test-only node structs return string from Type methods.
+      - Test descriptors can use string literals or string constants without nodetype.NodeType conversions.
+      - Existing behavior assertions remain intact.
+    dependencies:
+      - T1-registry-node-api-string
+    conflicts_with: []
+    context_files:
+      - path: compiler_test.go
+        description: Defines testNode with nodetype.NodeType and compiler registry setup.
+      - path: engine_test.go
+        description: Defines recordingEngineNode with nodetype.NodeType and registry setup.
+      - path: dispatcher_test.go
+        description: Defines recordingNode with nodetype.NodeType for dispatcher graph tests.
+      - path: define_test.go
+        description: Existing focused test for NodeDefinition.Type as string.
+    flags:
+      flaky: false
+      retries_used: 0
+      requires_design_validation: false
+    acceptance_criteria:
+      - AC4: No test Go code references nodetype.NodeType.
+      - AC5: Tests continue to express the same node type values start, task, and end.
+      - AC6: No behavioral assertions are weakened or removed solely to make compilation pass.
+    success_criteria:
+      - go test ./... passes after test migration.
+      - A workspace grep for nodetype.NodeType returns no Go-code matches.
+    tech_stack:
+      - Go 1.26
+    test_coverage: Existing tests are the validation surface for this task.
+    diag: null
+    handoff:
+      do_not_reinvestigate:
+        - Current tests import github.com/zhiyunliu/glow-flow/nodetype only for constants and NodeType conversions.
+      required_test_first: Run go test ./... after T1 and this task are complete.
+      target_files:
+        - compiler_test.go
+        - engine_test.go
+        - dispatcher_test.go
+      minimal_change: Convert test helper nodeType fields and Type methods to string; remove redundant casts/imports only when unused.
+      acceptance_checks:
+        - go test ./...
+        - grep confirms no nodetype.NodeType in Go tests.
+
+  - id: T3-docs-obsolete-package-check
+    title: Update docs and decide nodetype package fate
+    description: Refresh documentation references and only remove nodetype package if it is proven unused and safe.
+    wave: 3
+    agent: gem-implementer
+    status: pending
+    covers:
+      - Design documentation no longer recommends nodetype.NodeType.
+      - nodetype package is retained or removed based on actual remaining imports.
+      - Final validation covers code, tests, docs references, and diagnostics.
+    dependencies:
+      - T2-tests-fixtures-string
+    conflicts_with: []
+    context_files:
+      - path: docs/superpowers/specs/2026-07-29-visual-flow-engine-design.md
+        description: Contains outdated registry design text that explicitly recommends nodetype.NodeType.
+      - path: nodetype/node.type.go
+        description: Defines NodeType and constants; may become obsolete after migration.
+      - path: go.mod
+        description: Module root for go test ./... validation.
+    flags:
+      flaky: false
+      retries_used: 0
+      requires_design_validation: false
+    acceptance_criteria:
+      - AC7: No project usage of nodetype.NodeType remains in Go or docs.
+      - AC8: nodetype package is not removed unless all imports/usages are gone and go test ./... remains green.
+      - AC9: Documentation reflects string-based registry and node type contracts.
+      - AC10: Final diagnostics check has no new relevant errors in touched files.
+    success_criteria:
+      - go test ./... passes.
+      - get_errors on touched files reports no relevant new errors.
+      - grep for nodetype.NodeType returns no matches in repository scope excluding plan artifacts if needed.
+    tech_stack:
+      - Go 1.26
+      - Markdown docs
+    test_coverage: Full module test run is required because public interface changes touch multiple test suites.
+    diag: null
+    handoff:
+      do_not_reinvestigate:
+        - Design doc currently has examples using Type nodetype.NodeType and Get(nodeType nodetype.NodeType).
+      required_test_first: Run final go test ./... after docs/package decision to ensure package removal or retention is safe.
+      target_files:
+        - docs/superpowers/specs/2026-07-29-visual-flow-engine-design.md
+        - nodetype/node.type.go
+      minimal_change: Update docs to string contracts; delete nodetype only if no imports remain and tests pass.
+      acceptance_checks:
+        - go test ./...
+        - get_errors for touched files
+        - grep confirms no nodetype.NodeType remains outside historical plan files.

@@ -7,16 +7,22 @@ import (
 
 type Context interface {
 	context.Context
+	GetInstanceID() string
 	Get(key string) any
 	Set(key string, value any)
 }
 
-func NewContext(ctx context.Context) Context {
-	return &contextImpl{ctx: ctx}
+func NewContext(ctx context.Context, instanceID string) Context {
+	return &contextImpl{instanceID: instanceID, ctx: ctx}
 }
 
 type contextImpl struct {
-	ctx context.Context
+	instanceID string
+	ctx        context.Context
+}
+
+func (c *contextImpl) GetInstanceID() string {
+	return c.instanceID
 }
 
 func (c *contextImpl) Get(key string) any {

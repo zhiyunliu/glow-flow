@@ -3,31 +3,29 @@ package glowflow
 import (
 	"fmt"
 	"sync"
-
-	"github.com/zhiyunliu/glow-flow/nodetype"
 )
 
 type NodeFactory func(def NodeDefinition) (CompiledNode, error)
 
 type NodeDescriptor struct {
-	Type          nodetype.NodeType
+	Type          string
 	Factory       NodeFactory
 	DefaultConfig any
 }
 
 type Registry interface {
 	Register(desc NodeDescriptor) error
-	Get(nodeType nodetype.NodeType) (NodeDescriptor, bool)
+	Get(nodeType string) (NodeDescriptor, bool)
 	List() []NodeDescriptor
 }
 
 type registry struct {
 	mu    sync.RWMutex
-	nodes map[nodetype.NodeType]NodeDescriptor
+	nodes map[string]NodeDescriptor
 }
 
 func NewRegistry() Registry {
-	return &registry{nodes: make(map[nodetype.NodeType]NodeDescriptor)}
+	return &registry{nodes: make(map[string]NodeDescriptor)}
 }
 
 func (r *registry) Register(desc NodeDescriptor) error {
@@ -47,7 +45,7 @@ func (r *registry) Register(desc NodeDescriptor) error {
 	return nil
 }
 
-func (r *registry) Get(nodeType nodetype.NodeType) (NodeDescriptor, bool) {
+func (r *registry) Get(nodeType string) (NodeDescriptor, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	desc, ok := r.nodes[nodeType]

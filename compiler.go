@@ -1,6 +1,8 @@
 package glowflow
 
-import "fmt"
+import (
+	"fmt"
+)
 
 const DefaultRelationType = "default"
 

@@ -27,7 +27,7 @@
 - Node：节点抽象。
 - Context：运行上下文。
 - options：引擎配置。
-- nodetype：节点类型定义。
+- 节点类型：使用 string 标识，配置、注册表和节点接口保持一致。
 
 建议在此基础上扩展为以下分层：
 
@@ -93,7 +93,7 @@ type FlowDefinition struct {
 ```go
 type NodeDefinition struct {
     ID string `json:"id"`
-    Type nodetype.NodeType `json:"type"`
+    Type string `json:"type"`
     Name string `json:"name"`
     Layout Layout `json:"layout"`
     ExtParams map[string]any `json:"extparams"`
@@ -123,13 +123,13 @@ type ConnectionDefinition struct {
 
 ### 5.1 注册接口
 
-节点通过工厂函数注册到引擎。节点类型沿用当前项目里的 `nodetype.NodeType`，避免在配置、注册表、节点接口之间反复做字符串转换：
+节点通过工厂函数注册到引擎。节点类型统一使用 `string`，避免在配置、注册表、节点接口之间反复做类型转换：
 
 ```go
 type NodeFactory func() Node
 
 type NodeDescriptor struct {
-    Type nodetype.NodeType
+    Type string
     Factory NodeFactory
     DefaultConfig any
 }
@@ -142,7 +142,7 @@ type NodeDescriptor struct {
 ```go
 type Registry interface {
     Register(desc NodeDescriptor) error
-    Get(nodeType nodetype.NodeType) (NodeDescriptor, bool)
+    Get(nodeType string) (NodeDescriptor, bool)
     List() []NodeDescriptor
 }
 ```
@@ -201,7 +201,7 @@ type CompiledFlow struct {
 type Node interface {
     Id() string
     Name() string
-    Type() nodetype.NodeType
+    Type() string
     IsStartNode() bool
     Config() any
     Position() Position

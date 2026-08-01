@@ -73,7 +73,16 @@ func (e *Engine) Dispatch(flowID string, data any) (string, error) {
 	}
 	compiled := flow.compiled
 
-	return e.options.dispatcher.Dispatch(NewContext(context.Background()), compiled, data)
+	instanceID, err := newInstanceID()
+	if err != nil {
+		return "", err
+	}
+
+	err = e.options.dispatcher.Dispatch(NewContext(context.Background(), instanceID), compiled, data)
+	if err != nil {
+		return "", err
+	}
+	return instanceID, nil
 }
 
 // Stop stops the engine.

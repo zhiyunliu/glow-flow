@@ -1,7 +1,5 @@
 package glowflow
 
-import "github.com/zhiyunliu/glow-flow/nodetype"
-
 type Layout struct {
 	Desc string `json:"desc,omitempty"`
 	Icon string `json:"icon,omitempty"`
@@ -36,11 +34,11 @@ type FlowDefinition struct {
 }
 
 type NodeDefinition struct {
-	ID        string            `json:"id"`
-	Type      nodetype.NodeType `json:"type"`
-	Name      string            `json:"name"`
-	Layout    Layout            `json:"layout"`
-	ExtParams map[string]any    `json:"extparams,omitempty"`
+	ID        string         `json:"id"`
+	Type      string         `json:"type"`
+	Name      string         `json:"name"`
+	Layout    Layout         `json:"layout"`
+	ExtParams map[string]any `json:"extparams,omitempty"`
 }
 
 type ConnectionDefinition struct {

@@ -1,0 +1,184 @@
+{
+  "context_envelope": {
+    "meta": {
+      "plan_id": "20260801-remove-nodetype-nodetype",
+      "created_at": "2026-08-01T00:00:00Z",
+      "last_updated": "2026-08-01T00:00:00Z",
+      "version": "1"
+    },
+    "tech_stack": [
+      {
+        "name": "Go",
+        "version": "1.26",
+        "usage_context": "Core library and tests",
+        "config_files": ["go.mod"]
+      }
+    ],
+    "conventions": [
+      "Use idiomatic Go and keep changes minimal.",
+      "Use go test ./... as the final module verification.",
+      "Use apply_patch for code edits and do not revert unrelated changes."
+    ],
+    "constraints": {
+      "hard": [
+        "Objective is to remove all project usages of nodetype.NodeType and replace them with string.",
+        "NodeDefinition.Type is already string and should remain string.",
+        "Keep behavior compatible; preserve node type string values start, task, and end.",
+        "Do not delete package nodetype unless it is clearly unused and tests pass."
+      ],
+      "soft": [
+        "Prefer additive or local refactor over broad restructuring.",
+        "Avoid weakening existing behavioral tests."
+      ],
+      "compatibility": [
+        "Registry, NodeDescriptor, and Node.Type are public Go API surfaces and may affect consumers.",
+        "Compiler error text for unknown node types should remain compatible where practical."
+      ],
+      "security_requirements": []
+    },
+    "architecture_snapshot": {
+      "key_dirs": [
+        ".",
+        "defaults",
+        "nodetype",
+        "docs/superpowers/specs"
+      ],
+      "patterns": [
+        "FlowDefinition contains string node type definitions consumed by compiler.",
+        "Registry maps node type to NodeDescriptor and factories create CompiledNode values.",
+        "Tests use lightweight fake nodes implementing Node and CompiledNode interfaces."
+      ],
+      "key_components": [
+        {
+          "name": "Registry",
+          "location": "registry.go",
+          "responsibility": [
+            "Register node descriptors by type.",
+            "Lookup descriptors during compilation.",
+            "Expose descriptor list snapshots."
+          ]
+        },
+        {
+          "name": "Node interface",
+          "location": "node.go",
+          "responsibility": [
+            "Define runtime node identity, type, configuration, and execution contract."
+          ]
+        },
+        {
+          "name": "FlowCompiler",
+          "location": "compiler.go",
+          "responsibility": [
+            "Validate flow nodes and connections.",
+            "Resolve node descriptors from registry by NodeDefinition.Type.",
+            "Build compiled node graph and start-node list."
+          ]
+        },
+        {
+          "name": "nodetype package",
+          "location": "nodetype/node.type.go",
+          "responsibility": [
+            "Currently defines NodeType and start/task/end constants.",
+            "May become obsolete after string migration."
+          ]
+        }
+      ]
+    },
+    "research_digest": {
+      "relevant_files": [
+        {
+          "path": "registry.go",
+          "purpose": ["Primary owner of nodetype.NodeType public and internal registry usage."],
+          "confidence": 0.98
+        },
+        {
+          "path": "node.go",
+          "purpose": ["Public Node.Type currently returns nodetype.NodeType."],
+          "confidence": 0.98
+        },
+        {
+          "path": "compiler.go",
+          "purpose": ["Casts NodeDefinition.Type to nodetype.NodeType before registry lookup."],
+          "confidence": 0.95
+        },
+        {
+          "path": "compiler_test.go",
+          "purpose": ["Test helper and registry setup use nodetype.NodeType and casts."],
+          "confidence": 0.95
+        },
+        {
+          "path": "engine_test.go",
+          "purpose": ["Engine test fake node and registry setup use nodetype.NodeType."],
+          "confidence": 0.9
+        },
+        {
+          "path": "dispatcher_test.go",
+          "purpose": ["Dispatcher fake node uses nodetype.NodeType."],
+          "confidence": 0.9
+        },
+        {
+          "path": "docs/superpowers/specs/2026-07-29-visual-flow-engine-design.md",
+          "purpose": ["Design docs explicitly recommend nodetype.NodeType in registry examples."],
+          "confidence": 0.9
+        },
+        {
+          "path": "nodetype/node.type.go",
+          "purpose": ["Defines NodeType and string-valued constants."],
+          "confidence": 0.95
+        }
+      ],
+      "patterns_found": [
+        {
+          "name": "String-backed type alias layer",
+          "category": "type-migration",
+          "confidence": 0.9,
+          "example_location": ["nodetype/node.type.go", "registry.go", "compiler.go"]
+        },
+        {
+          "name": "Compiler registry lookup by definition type",
+          "category": "runtime-flow",
+          "confidence": 0.95,
+          "example_location": ["compiler.go"]
+        }
+      ],
+      "gotchas": [
+        {
+          "text": "Removing nodetype constants may require replacing nodetype.StartNode/TaskNode usages even after NodeType is gone.",
+          "confidence": 0.82
+        },
+        {
+          "text": "Plan files themselves may mention nodetype.NodeType; final grep should exclude docs/plan artifacts if checking repository history artifacts.",
+          "confidence": 0.75
+        },
+        {
+          "text": "User or formatter may have changed define.go after previous turn; execution should read current files before editing.",
+          "confidence": 0.9
+        }
+      ]
+    },
+    "prior_decisions": [
+      {
+        "decision": "Keep NodeDefinition.Type as string.",
+        "rationale": [
+          "Current define.go already defines Type string.",
+          "User objective is to replace nodetype.NodeType usages with string."
+        ],
+        "confidence": 0.95
+      },
+      {
+        "decision": "Do not plan unconditional package deletion.",
+        "rationale": [
+          "User requested minimal behavior-compatible refactor.",
+          "Package nodetype may still provide constants until usage audit confirms removal is safe."
+        ],
+        "confidence": 0.85
+      }
+    ],
+    "reuse_notes": [
+      {
+        "path": "/memories/repo/d_default_node_factory_nil.md",
+        "trust": "high"
+      }
+    ]
+  }
+}
