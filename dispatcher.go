@@ -8,7 +8,7 @@ import (
 )
 
 type Dispatcher interface {
-	Dispatch(ctx Context, flow *CompiledFlow, data any) (err error)
+	Dispatch(ctx Context, flow *CompiledChain, data any) (err error)
 }
 
 type dispatcher struct{}
@@ -17,12 +17,12 @@ func NewDispatcher() Dispatcher {
 	return &dispatcher{}
 }
 
-func (d *dispatcher) Dispatch(ctx Context, flow *CompiledFlow, data any) error {
+func (d *dispatcher) Dispatch(ctx Context, flow *CompiledChain, data any) error {
 	if ctx == nil {
 		return fmt.Errorf("context is nil")
 	}
 	if flow == nil {
-		return fmt.Errorf("compiled flow is nil")
+		return fmt.Errorf("compiled chain is nil")
 	}
 	var asyncGroup errgroup.Group
 
@@ -33,7 +33,7 @@ func (d *dispatcher) Dispatch(ctx Context, flow *CompiledFlow, data any) error {
 	return asyncGroup.Wait()
 }
 
-func (d *dispatcher) dispatchNode(asyncGroup *errgroup.Group, ctx Context, flow *CompiledFlow, node CompiledNode, data any) error {
+func (d *dispatcher) dispatchNode(asyncGroup *errgroup.Group, ctx Context, flow *CompiledChain, node CompiledNode, data any) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func (d *dispatcher) dispatchNode(asyncGroup *errgroup.Group, ctx Context, flow 
 	return nil
 }
 
-func (d *dispatcher) asyncCall(asyncGroup *errgroup.Group, ctx Context, flow *CompiledFlow, node CompiledNode, data any) func() error {
+func (d *dispatcher) asyncCall(asyncGroup *errgroup.Group, ctx Context, flow *CompiledChain, node CompiledNode, data any) func() error {
 	return func() error {
 		return d.dispatchNode(asyncGroup, ctx, flow, node, data)
 	}

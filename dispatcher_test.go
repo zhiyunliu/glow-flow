@@ -42,7 +42,7 @@ func TestDispatcherRoutesByRelationType(t *testing.T) {
 	}
 	trueNode := &recordingNode{id: "true-node", name: "true", nodeType: "task"}
 	falseNode := &recordingNode{id: "false-node", name: "false", nodeType: "task"}
-	flow := &CompiledFlow{
+	flow := &CompiledChain{
 		Nodes: map[string]CompiledNode{
 			"start":      start,
 			"true-node":  trueNode,
@@ -85,7 +85,7 @@ func TestDispatcherUsesDefaultRelationFallback(t *testing.T) {
 		},
 	}
 	defaultNode := &recordingNode{id: "default-node", name: "default", nodeType: "task"}
-	flow := &CompiledFlow{
+	flow := &CompiledChain{
 		Nodes: map[string]CompiledNode{
 			"start":        start,
 			"default-node": defaultNode,
@@ -109,7 +109,7 @@ func TestDispatcherUsesDefaultRelationFallback(t *testing.T) {
 
 func TestDispatcherReturnsDifferentInstanceIDPerDispatch(t *testing.T) {
 	start := &recordingNode{id: "start", name: "start", nodeType: "start", start: true}
-	flow := &CompiledFlow{StartNodes: []CompiledNode{start}}
+	flow := &CompiledChain{StartNodes: []CompiledNode{start}}
 	dispatcher := NewDispatcher()
 
 	err := dispatcher.Dispatch(NewContext(context.Background(), "instance-1"), flow, "first")

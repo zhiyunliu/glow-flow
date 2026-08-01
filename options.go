@@ -4,7 +4,7 @@ type options struct {
 	dataRepository DataRepository
 	stateStorage   StateStorage
 	registry       Registry
-	compiler       FlowCompiler
+	compiler       ChainCompiler
 	dispatcher     Dispatcher
 }
 
@@ -31,7 +31,7 @@ func WithRegistry(registry Registry) Option {
 	}
 }
 
-func WithFlowCompiler(compiler FlowCompiler) Option {
+func WithChainCompiler(compiler ChainCompiler) Option {
 	return func(o *options) {
 		o.compiler = compiler
 	}

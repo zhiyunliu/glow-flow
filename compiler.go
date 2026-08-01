@@ -6,28 +6,28 @@ import (
 
 const DefaultRelationType = "default"
 
-type FlowCompiler interface {
-	Compile(def ChainDefinition, registry Registry) (*CompiledFlow, error)
+type ChainCompiler interface {
+	Compile(def ChainDefinition, registry Registry) (*CompiledChain, error)
 }
 
-type flowCompiler struct{}
+type chainCompiler struct{}
 
-func NewFlowCompiler() FlowCompiler {
-	return &flowCompiler{}
+func NewChainCompiler() ChainCompiler {
+	return &chainCompiler{}
 }
 
-type CompiledFlow struct {
+type CompiledChain struct {
 	Definition ChainDefinition
 	Nodes      map[string]CompiledNode
 	Graph      map[string]map[string][]CompiledNode
 	StartNodes []CompiledNode
 }
 
-func (f *CompiledFlow) NextNodes(nodeID string, relationType string) []CompiledNode {
-	if f == nil {
+func (c *CompiledChain) NextNodes(nodeID string, relationType string) []CompiledNode {
+	if c == nil {
 		return nil
 	}
-	byRelation, ok := f.Graph[nodeID]
+	byRelation, ok := c.Graph[nodeID]
 	if !ok {
 		return nil
 	}
@@ -38,11 +38,11 @@ func (f *CompiledFlow) NextNodes(nodeID string, relationType string) []CompiledN
 	return append([]CompiledNode(nil), nodes...)
 }
 
-func (c *flowCompiler) Compile(def ChainDefinition, registry Registry) (*CompiledFlow, error) {
+func (c *chainCompiler) Compile(def ChainDefinition, registry Registry) (*CompiledChain, error) {
 	if registry == nil {
 		return nil, fmt.Errorf("registry is nil")
 	}
-	compiled := &CompiledFlow{
+	compiled := &CompiledChain{
 		Definition: def,
 		Nodes:      make(map[string]CompiledNode, len(def.Nodes)),
 		Graph:      make(map[string]map[string][]CompiledNode),

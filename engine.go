@@ -20,7 +20,7 @@ type flowSeries struct {
 
 type flowRuntime struct {
 	definition ChainDefinition
-	compiled   *CompiledFlow
+	compiled   *CompiledChain
 }
 
 // NewEngine creates a new engine with the given options.
@@ -36,7 +36,7 @@ func NewEngine(opts ...Option) *Engine {
 		engine.options.registry = NewRegistry()
 	}
 	if engine.options.compiler == nil {
-		engine.options.compiler = NewFlowCompiler()
+		engine.options.compiler = NewChainCompiler()
 	}
 	if engine.options.dispatcher == nil {
 		engine.options.dispatcher = NewDispatcher()
