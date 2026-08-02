@@ -13,6 +13,10 @@ type Dispatcher interface {
 
 type dispatcher struct{}
 
+var (
+	DefaultDispatcher Dispatcher = NewDispatcher()
+)
+
 func NewDispatcher() Dispatcher {
 	return &dispatcher{}
 }

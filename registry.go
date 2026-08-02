@@ -5,7 +5,15 @@ import (
 	"sync"
 )
 
-type NodeFactory func(def NodeDefinition) (CompiledNode, error)
+type nodeFactoryFunc func(def NodeDefinition) (CompiledNode, error)
+
+func (f nodeFactoryFunc) Build(def NodeDefinition) (CompiledNode, error) {
+	return f(def)
+}
+
+type NodeFactory interface {
+	Build(def NodeDefinition) (CompiledNode, error)
+}
 
 type NodeDescriptor struct {
 	Type          string
@@ -23,6 +31,10 @@ type registry struct {
 	mu    sync.RWMutex
 	nodes map[string]NodeDescriptor
 }
+
+var (
+	DefaultRegistry = NewRegistry()
+)
 
 func NewRegistry() Registry {
 	return &registry{nodes: make(map[string]NodeDescriptor)}

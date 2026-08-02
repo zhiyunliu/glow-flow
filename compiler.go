@@ -12,6 +12,10 @@ type ChainCompiler interface {
 
 type chainCompiler struct{}
 
+var (
+	DefaultChainCompiler = NewChainCompiler()
+)
+
 func NewChainCompiler() ChainCompiler {
 	return &chainCompiler{}
 }
@@ -59,7 +63,7 @@ func (c *chainCompiler) Compile(def ChainDefinition, registry Registry) (*Compil
 		if !ok {
 			return nil, fmt.Errorf("node type is not registered: %s", nodeDef.Type)
 		}
-		node, err := desc.Factory(nodeDef)
+		node, err := desc.Factory.Build(nodeDef)
 		if err != nil {
 			return nil, fmt.Errorf("create node %s: %w", nodeDef.ID, err)
 		}

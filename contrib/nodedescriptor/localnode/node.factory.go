@@ -1,7 +1,10 @@
-package defaults
+package localnode
 
 import glowflow "github.com/zhiyunliu/glow-flow"
 
 func DefaultNodeFactory(def glowflow.NodeDefinition) (glowflow.CompiledNode, error) {
 	return nil, nil
+}
+func init() {
+
 }

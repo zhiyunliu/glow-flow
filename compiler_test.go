@@ -27,18 +27,18 @@ func TestFlowCompilerBuildsRelationGraph(t *testing.T) {
 	registry := NewRegistry()
 	err := registry.Register(NodeDescriptor{
 		Type: "start",
-		Factory: func(def NodeDefinition) (CompiledNode, error) {
+		Factory: nodeFactoryFunc(func(def NodeDefinition) (CompiledNode, error) {
 			return &testNode{id: def.ID, name: def.Name, nodeTyp: def.Type, start: true, config: def.ExtParams}, nil
-		},
+		}),
 	})
 	if err != nil {
 		t.Fatalf("register start node: %v", err)
 	}
 	err = registry.Register(NodeDescriptor{
 		Type: "task",
-		Factory: func(def NodeDefinition) (CompiledNode, error) {
+		Factory: nodeFactoryFunc(func(def NodeDefinition) (CompiledNode, error) {
 			return &testNode{id: def.ID, name: def.Name, nodeTyp: def.Type, config: def.ExtParams}, nil
-		},
+		}),
 	})
 	if err != nil {
 		t.Fatalf("register task node: %v", err)

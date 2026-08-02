@@ -8,9 +8,9 @@ func TestRegistryUsesStringNodeTypes(t *testing.T) {
 
 	err := registry.Register(NodeDescriptor{
 		Type: nodeType,
-		Factory: func(def NodeDefinition) (CompiledNode, error) {
+		Factory: nodeFactoryFunc(func(def NodeDefinition) (CompiledNode, error) {
 			return nil, nil
-		},
+		}),
 	})
 	if err != nil {
 		t.Fatalf("register node: %v", err)

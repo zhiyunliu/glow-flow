@@ -29,20 +29,14 @@ func NewEngine(opts ...Option) *Engine {
 		options: &options{
 			dataRepository: DefaultRepository,
 			stateStorage:   DefaultStateStorage,
+			registry:       DefaultRegistry,
+			compiler:       DefaultChainCompiler,
+			dispatcher:     DefaultDispatcher,
 		},
 		chains: cmap.New[*chainSeries](),
 	}
 	for _, opt := range opts {
 		opt(engine.options)
-	}
-	if engine.options.registry == nil {
-		engine.options.registry = NewRegistry()
-	}
-	if engine.options.compiler == nil {
-		engine.options.compiler = NewChainCompiler()
-	}
-	if engine.options.dispatcher == nil {
-		engine.options.dispatcher = NewDispatcher()
 	}
 	return engine
 }
