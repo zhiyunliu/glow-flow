@@ -162,12 +162,12 @@ type recordingEngineNode struct {
 	instances map[string][]string
 }
 
-func (n *recordingEngineNode) Id() string         { return n.id }
-func (n *recordingEngineNode) Name() string       { return n.id }
-func (n *recordingEngineNode) Type() string       { return n.nodeType }
-func (n *recordingEngineNode) IsStartNode() bool  { return n.start }
-func (n *recordingEngineNode) Config() any        { return nil }
-func (n *recordingEngineNode) Position() Position { return Position{} }
+func (n *recordingEngineNode) Id() string        { return n.id }
+func (n *recordingEngineNode) Name() string      { return n.id }
+func (n *recordingEngineNode) Type() string      { return n.nodeType }
+func (n *recordingEngineNode) IsStartNode() bool { return n.start }
+func (n *recordingEngineNode) Config() any       { return nil }
+func (n *recordingEngineNode) Layout() Layout    { return Layout{} }
 func (n *recordingEngineNode) Execute(ctx Context, data any) (ExecuteResult, error) {
 	n.executed[n.id]++
 	if n.inputs != nil {

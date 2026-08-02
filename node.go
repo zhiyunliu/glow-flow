@@ -1,10 +1,5 @@
 package glowflow
 
-// Position is the position of the node in the flow.
-type Position struct {
-	X, Y int
-}
-
 type ExecuteResult struct {
 	RelationType string
 	Data         any
@@ -17,7 +12,7 @@ type Node interface {
 	Type() string
 	IsStartNode() bool
 	Config() any
-	Position() Position
+	Layout() Layout
 }
 
 type CompiledNode interface {

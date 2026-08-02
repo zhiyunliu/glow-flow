@@ -10,7 +10,7 @@ type testNode struct {
 	nodeTyp string
 	start   bool
 	config  any
-	pos     Position
+	layout  Layout
 	result  ExecuteResult
 }
 
@@ -19,7 +19,7 @@ func (n *testNode) Name() string                                         { retur
 func (n *testNode) Type() string                                         { return n.nodeTyp }
 func (n *testNode) IsStartNode() bool                                    { return n.start }
 func (n *testNode) Config() any                                          { return n.config }
-func (n *testNode) Position() Position                                   { return n.pos }
+func (n *testNode) Layout() Layout                                       { return n.layout }
 func (n *testNode) Execute(ctx Context, data any) (ExecuteResult, error) { return n.result, nil }
 func (n *testNode) NextNodes() []CompiledNode                            { return nil }
 

@@ -16,12 +16,12 @@ type recordingNode struct {
 	execError error
 }
 
-func (n *recordingNode) Id() string         { return n.id }
-func (n *recordingNode) Name() string       { return n.name }
-func (n *recordingNode) Type() string       { return n.nodeType }
-func (n *recordingNode) IsStartNode() bool  { return n.start }
-func (n *recordingNode) Config() any        { return nil }
-func (n *recordingNode) Position() Position { return Position{} }
+func (n *recordingNode) Id() string        { return n.id }
+func (n *recordingNode) Name() string      { return n.name }
+func (n *recordingNode) Type() string      { return n.nodeType }
+func (n *recordingNode) IsStartNode() bool { return n.start }
+func (n *recordingNode) Config() any       { return nil }
+func (n *recordingNode) Layout() Layout    { return Layout{} }
 func (n *recordingNode) Execute(ctx Context, data any) (ExecuteResult, error) {
 	n.inputs = append(n.inputs, data)
 	n.instances = append(n.instances, ctx.GetInstanceID())
