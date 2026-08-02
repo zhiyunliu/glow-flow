@@ -10,7 +10,6 @@ type Node interface {
 	Id() string
 	Name() string
 	Type() string
-	IsStartNode() bool
 	Config() any
 	Layout() Layout
 }

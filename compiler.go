@@ -68,9 +68,6 @@ func (c *chainCompiler) Compile(def ChainDefinition, registry Registry) (*Compil
 			return nil, fmt.Errorf("create node %s: %w", nodeDef.ID, err)
 		}
 		compiled.Nodes[nodeDef.ID] = node
-		if node.IsStartNode() {
-			compiled.StartNodes = append(compiled.StartNodes, node)
-		}
 	}
 
 	for _, connection := range def.Connections {
@@ -91,6 +88,24 @@ func (c *chainCompiler) Compile(def ChainDefinition, registry Registry) (*Compil
 		}
 		compiled.Graph[fromNode.Id()][relationType] = append(compiled.Graph[fromNode.Id()][relationType], toNode)
 	}
-
+	c.caclStartNodes(compiled)
 	return compiled, nil
+}
+
+func (c *chainCompiler) caclStartNodes(compiled *CompiledChain) {
+	compiled.StartNodes = nil
+	incoming := make(map[string]struct{}, len(compiled.Definition.Connections))
+	for _, connection := range compiled.Definition.Connections {
+		incoming[connection.ToID] = struct{}{}
+	}
+
+	for _, nodeDef := range compiled.Definition.Nodes {
+		if _, exists := incoming[nodeDef.ID]; exists {
+			continue
+		}
+		node, ok := compiled.Nodes[nodeDef.ID]
+		if ok {
+			compiled.StartNodes = append(compiled.StartNodes, node)
+		}
+	}
 }
