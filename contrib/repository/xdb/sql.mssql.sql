@@ -1,3 +1,12 @@
+IF DB_ID(N'glowflow') IS NULL
+BEGIN
+	EXEC(N'CREATE DATABASE glowflow COLLATE Chinese_PRC_CI_AS');
+END;
+GO
+
+USE glowflow;
+GO
+
 IF OBJECT_ID(N'dbo.flow_chain_definition', N'U') IS NULL
 BEGIN
 	CREATE TABLE dbo.flow_chain_definition (
