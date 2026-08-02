@@ -93,6 +93,11 @@ func (r *xdbRepository) LoadBasicInfra(ctx context.Context, infraNo string) (*gl
 	return r.newBasicInfra(infra)
 }
 
+func (r *xdbRepository) Close() error {
+	// No resources to close for XDB repository
+	return nil
+}
+
 func (r *xdbRepository) buildChainDefinition(ctx context.Context, chainDefs []*models.ChainDefinition, nodeDefs []*models.NodeDefinition, connDefs []*models.ConnectionDefinition) ([]*glowflow.ChainDefinition, error) {
 	_ = ctx
 	selected := make(map[string]*models.ChainDefinition)
