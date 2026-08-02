@@ -26,6 +26,7 @@ func TestXDBDAOQueriesUseChainNoAndSchemaTables(t *testing.T) {
 				"chain_no",
 				"version_id",
 				"status",
+				"with (nolock)",
 			},
 		},
 		{
@@ -38,6 +39,7 @@ func TestXDBDAOQueriesUseChainNoAndSchemaTables(t *testing.T) {
 				"chain_no",
 				"version_id",
 				"node_def_no",
+				"with (nolock)",
 			},
 		},
 		{
@@ -50,6 +52,18 @@ func TestXDBDAOQueriesUseChainNoAndSchemaTables(t *testing.T) {
 				"version_id",
 				"from_id",
 				"to_id",
+				"with (nolock)",
+			},
+		},
+		{
+			name:  "LoadBasicInfra",
+			query: sqls.LoadBasicInfra,
+			required: []string{
+				"--sql",
+				"flow_basic_infra",
+				"infra_no",
+				"infra_type",
+				"with (nolock)",
 			},
 		},
 	}
@@ -117,6 +131,9 @@ func TestXDBDAOScopedLoadersPassChainNoParameter(t *testing.T) {
 			if !strings.Contains(strings.ToLower(dbObj.sql), "@{chain_no}") {
 				t.Fatalf("%s SQL must include scoped chain_no parameter: %s", tt.name, dbObj.sql)
 			}
+			if !strings.Contains(strings.ToLower(dbObj.sql), "with (nolock)") {
+				t.Fatalf("%s SQL must include nolock table hints: %s", tt.name, dbObj.sql)
+			}
 			want := chainNoParam{ChainNo: "chain-a"}
 			if !reflect.DeepEqual(dbObj.input, want) {
 				t.Fatalf("%s input = %#v, want %#v", tt.name, dbObj.input, want)
@@ -125,9 +142,38 @@ func TestXDBDAOScopedLoadersPassChainNoParameter(t *testing.T) {
 	}
 }
 
+func TestXDBDAOLoadBasicInfraPassesInfraNoParameter(t *testing.T) {
+	dbObj := &recordingExecuter{}
+	infra, err := LoadBasicInfra(context.Background(), dbObj, "infra-a")
+	if err != nil {
+		t.Fatalf("LoadBasicInfra returned error: %v", err)
+	}
+	if infra == nil {
+		t.Fatalf("LoadBasicInfra returned nil infra")
+	}
+	if dbObj.method != "FirstAs" {
+		t.Fatalf("LoadBasicInfra must use FirstAs, got %s", dbObj.method)
+	}
+	if dbObj.sql != sqls.LoadBasicInfra {
+		t.Fatalf("LoadBasicInfra SQL mismatch")
+	}
+	query := strings.ToLower(dbObj.sql)
+	if !strings.Contains(query, "@{infra_no}") {
+		t.Fatalf("LoadBasicInfra SQL must include scoped infra_no parameter: %s", dbObj.sql)
+	}
+	if !strings.Contains(query, "with (nolock)") {
+		t.Fatalf("LoadBasicInfra SQL must include nolock table hints: %s", dbObj.sql)
+	}
+	want := infraNoParam{InfraNo: "infra-a"}
+	if !reflect.DeepEqual(dbObj.input, want) {
+		t.Fatalf("LoadBasicInfra input = %#v, want %#v", dbObj.input, want)
+	}
+}
+
 type recordingExecuter struct {
-	sql   string
-	input any
+	method string
+	sql    string
+	input  any
 }
 
 func (r *recordingExecuter) Query(ctx context.Context, sql string, input any, opts ...xdb.TemplateOption) (xdb.Rows, error) {
@@ -151,11 +197,15 @@ func (r *recordingExecuter) Exec(ctx context.Context, sql string, input any, opt
 }
 
 func (r *recordingExecuter) QueryAs(ctx context.Context, sql string, input any, result any, opts ...xdb.TemplateOption) error {
+	r.method = "QueryAs"
 	r.sql = sql
 	r.input = input
 	return nil
 }
 
 func (r *recordingExecuter) FirstAs(ctx context.Context, sql string, input any, result any, opts ...xdb.TemplateOption) error {
+	r.method = "FirstAs"
+	r.sql = sql
+	r.input = input
 	return nil
 }

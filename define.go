@@ -12,9 +12,7 @@ type Layout struct {
 type ChainMetadata struct {
 	ID        string         `json:"id"`
 	Name      string         `json:"name"`
-	Root      bool           `json:"root"`
-	Disabled  bool           `json:"disabled"`
-	Status    string         `json:"status"`
+	Status    int            `json:"status"`
 	ExtParams map[string]any `json:"extparams,omitempty"`
 	Layout    Layout         `json:"layout,omitempty"`
 }
@@ -52,4 +50,12 @@ type ConnectionDefinition struct {
 	ToID   string `json:"to_id"`
 	Type   string `json:"type"`
 	Remark string `json:"remark,omitempty"`
+}
+
+type BasicInfra struct {
+	InfraNo   string         `json:"infra_no"`
+	Name      string         `json:"name"`
+	Type      string         `json:"type"`
+	Desc      string         `json:"desc"`
+	ExtParams map[string]any `json:"extparams,omitempty"`
 }

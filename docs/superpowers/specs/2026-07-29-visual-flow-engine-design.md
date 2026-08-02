@@ -62,7 +62,7 @@ internal/
 
 流程定义是可视化编辑器导出的配置结构，包含：
 
-- metadata：流程元信息（id、name、root、disabled、layout、extparams）
+- metadata：流程元信息（id、name、status、layout、extparams）
 - endpoints：流程的入/出端点
 - nodes：流程中的节点集合
 - connections：节点之间的连线集合

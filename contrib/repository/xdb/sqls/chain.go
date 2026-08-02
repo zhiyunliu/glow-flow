@@ -5,7 +5,7 @@ WITH latest_active_version AS (
 	SELECT
 		version.chain_no,
 		MAX(version.version_id) AS version_id
-	FROM dbo.flow_chain_version AS version
+	FROM dbo.flow_chain_version AS version WITH (NOLOCK)
 	WHERE version.[status] = 1
 	GROUP BY version.chain_no
 )
@@ -17,10 +17,10 @@ SELECT
 	version.extparams,
 	version.layout,
 	version.[desc] AS [desc]
-FROM dbo.flow_chain_definition AS chain
+FROM dbo.flow_chain_definition AS chain WITH (NOLOCK)
 INNER JOIN latest_active_version AS latest
 	ON latest.chain_no = chain.chain_no
-INNER JOIN dbo.flow_chain_version AS version
+INNER JOIN dbo.flow_chain_version AS version WITH (NOLOCK)
 	ON version.chain_no = latest.chain_no
 	AND version.version_id = latest.version_id
 WHERE chain.[status] = 1
@@ -31,7 +31,7 @@ WITH latest_active_version AS (
 	SELECT
 		version.chain_no,
 		MAX(version.version_id) AS version_id
-	FROM dbo.flow_chain_version AS version
+	FROM dbo.flow_chain_version AS version WITH (NOLOCK)
 	WHERE version.[status] = 1
 		AND version.chain_no = @{chain_no}
 	GROUP BY version.chain_no
@@ -44,10 +44,10 @@ SELECT
 	version.extparams,
 	version.layout,
 	version.[desc] AS [desc]
-FROM dbo.flow_chain_definition AS chain
+FROM dbo.flow_chain_definition AS chain WITH (NOLOCK)
 INNER JOIN latest_active_version AS latest
 	ON latest.chain_no = chain.chain_no
-INNER JOIN dbo.flow_chain_version AS version
+INNER JOIN dbo.flow_chain_version AS version WITH (NOLOCK)
 	ON version.chain_no = latest.chain_no
 	AND version.version_id = latest.version_id
 WHERE chain.[status] = 1
@@ -59,8 +59,8 @@ WITH latest_active_version AS (
 	SELECT
 		version.chain_no,
 		MAX(version.version_id) AS version_id
-	FROM dbo.flow_chain_version AS version
-	INNER JOIN dbo.flow_chain_definition AS chain
+	FROM dbo.flow_chain_version AS version WITH (NOLOCK)
+	INNER JOIN dbo.flow_chain_definition AS chain WITH (NOLOCK)
 		ON chain.chain_no = version.chain_no
 	WHERE chain.[status] = 1
 		AND version.[status] = 1
@@ -78,11 +78,11 @@ SELECT
 	definition.extparams AS definition_extparams,
 	definition.layout_definition,
 	definition.[desc] AS [desc]
-FROM dbo.flow_chain_node AS node
+FROM dbo.flow_chain_node AS node WITH (NOLOCK)
 INNER JOIN latest_active_version AS latest
 	ON latest.chain_no = node.chain_no
 	AND latest.version_id = node.version_id
-INNER JOIN dbo.flow_node_definition AS definition
+INNER JOIN dbo.flow_node_definition AS definition WITH (NOLOCK)
 	ON definition.node_def_no = node.node_def_no
 ORDER BY node.chain_no, node.version_id, node.node_id`
 
@@ -91,8 +91,8 @@ WITH latest_active_version AS (
 	SELECT
 		version.chain_no,
 		MAX(version.version_id) AS version_id
-	FROM dbo.flow_chain_version AS version
-	INNER JOIN dbo.flow_chain_definition AS chain
+	FROM dbo.flow_chain_version AS version WITH (NOLOCK)
+	INNER JOIN dbo.flow_chain_definition AS chain WITH (NOLOCK)
 		ON chain.chain_no = version.chain_no
 	WHERE chain.[status] = 1
 		AND version.[status] = 1
@@ -111,11 +111,11 @@ SELECT
 	definition.extparams AS definition_extparams,
 	definition.layout_definition,
 	definition.[desc] AS [desc]
-FROM dbo.flow_chain_node AS node
+FROM dbo.flow_chain_node AS node WITH (NOLOCK)
 INNER JOIN latest_active_version AS latest
 	ON latest.chain_no = node.chain_no
 	AND latest.version_id = node.version_id
-INNER JOIN dbo.flow_node_definition AS definition
+INNER JOIN dbo.flow_node_definition AS definition WITH (NOLOCK)
 	ON definition.node_def_no = node.node_def_no
 ORDER BY node.chain_no, node.version_id, node.node_id`
 
@@ -124,8 +124,8 @@ WITH latest_active_version AS (
 	SELECT
 		version.chain_no,
 		MAX(version.version_id) AS version_id
-	FROM dbo.flow_chain_version AS version
-	INNER JOIN dbo.flow_chain_definition AS chain
+	FROM dbo.flow_chain_version AS version WITH (NOLOCK)
+	INNER JOIN dbo.flow_chain_definition AS chain WITH (NOLOCK)
 		ON chain.chain_no = version.chain_no
 	WHERE chain.[status] = 1
 		AND version.[status] = 1
@@ -140,7 +140,7 @@ SELECT
 	connection.[type] AS [type],
 	connection.remark,
 	connection.extparams
-FROM dbo.flow_chain_connection AS connection
+FROM dbo.flow_chain_connection AS connection WITH (NOLOCK)
 INNER JOIN latest_active_version AS latest
 	ON latest.chain_no = connection.chain_no
 	AND latest.version_id = connection.version_id
@@ -151,8 +151,8 @@ WITH latest_active_version AS (
 	SELECT
 		version.chain_no,
 		MAX(version.version_id) AS version_id
-	FROM dbo.flow_chain_version AS version
-	INNER JOIN dbo.flow_chain_definition AS chain
+	FROM dbo.flow_chain_version AS version WITH (NOLOCK)
+	INNER JOIN dbo.flow_chain_definition AS chain WITH (NOLOCK)
 		ON chain.chain_no = version.chain_no
 	WHERE chain.[status] = 1
 		AND version.[status] = 1
@@ -168,8 +168,17 @@ SELECT
 	connection.[type] AS [type],
 	connection.remark,
 	connection.extparams
-FROM dbo.flow_chain_connection AS connection
+FROM dbo.flow_chain_connection AS connection WITH (NOLOCK)
 INNER JOIN latest_active_version AS latest
 	ON latest.chain_no = connection.chain_no
 	AND latest.version_id = connection.version_id
 ORDER BY connection.chain_no, connection.version_id, connection.conn_id`
+
+const LoadBasicInfra = `--sql
+SELECT
+	infra.infra_no,
+	infra.infra_type,
+	infra.extparams,
+	infra.[desc] AS [desc]
+FROM dbo.flow_basic_infra AS infra WITH (NOLOCK)
+WHERE infra.infra_no = @{infra_no}`

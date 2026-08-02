@@ -10,11 +10,9 @@ func TestChainDefinitionPreservesJSONShape(t *testing.T) {
 		ID:      "chain-a",
 		Version: "v1",
 		Metadata: ChainMetadata{
-			ID:       "meta-a",
-			Name:     "Chain A",
-			Root:     true,
-			Disabled: true,
-			Status:   "active",
+			ID:     "meta-a",
+			Name:   "Chain A",
+			Status: 1,
 			ExtParams: map[string]any{
 				"level": "gold",
 			},
@@ -49,13 +47,19 @@ func TestChainDefinitionPreservesJSONShape(t *testing.T) {
 	if !ok {
 		t.Fatalf("metadata = %#v, want object", got["metadata"])
 	}
-	for _, field := range []string{"id", "name", "root", "disabled", "extparams", "layout"} {
+	for _, field := range []string{"id", "name", "status", "extparams", "layout"} {
 		if _, ok := metadata[field]; !ok {
 			t.Fatalf("metadata json field %q is missing in %s", field, string(data))
 		}
 	}
-	if metadata["root"] != true || metadata["disabled"] != true {
-		t.Fatalf("metadata root/disabled values = %v/%v, want true/true", metadata["root"], metadata["disabled"])
+	if _, ok := metadata["root"]; ok {
+		t.Fatalf("metadata root should not be serialized in %s", string(data))
+	}
+	if _, ok := metadata["disabled"]; ok {
+		t.Fatalf("metadata disabled should not be serialized in %s", string(data))
+	}
+	if metadata["status"] != float64(1) {
+		t.Fatalf("metadata status = %#v, want 1", metadata["status"])
 	}
 }
 

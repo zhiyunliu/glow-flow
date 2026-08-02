@@ -53,19 +53,19 @@ func (r *xdbRepository) LoadChainDefinitions(ctx context.Context) ([]*glowflow.C
 }
 
 // LoadChainDefinition loads a specific chain definition from the XDB.
-func (r *xdbRepository) LoadChainDefinition(ctx context.Context, chainID string) (*glowflow.ChainDefinition, error) {
+func (r *xdbRepository) LoadChainDefinition(ctx context.Context, chainNo string) (*glowflow.ChainDefinition, error) {
 	dbObj := dbResolver(r.dbConnName)
-	chainDefs, err := daos.LoadChainDefinition(ctx, dbObj, chainID)
+	chainDefs, err := daos.LoadChainDefinition(ctx, dbObj, chainNo)
 	if err != nil {
 		return nil, err
 	}
 
-	nodeDefs, err := daos.LoadChainNodesByChainNo(ctx, dbObj, chainID)
+	nodeDefs, err := daos.LoadChainNodesByChainNo(ctx, dbObj, chainNo)
 	if err != nil {
 		return nil, err
 	}
 
-	connDefs, err := daos.LoadChainConnectionsByChainNo(ctx, dbObj, chainID)
+	connDefs, err := daos.LoadChainConnectionsByChainNo(ctx, dbObj, chainNo)
 	if err != nil {
 		return nil, err
 	}
@@ -75,9 +75,22 @@ func (r *xdbRepository) LoadChainDefinition(ctx context.Context, chainID string)
 		return nil, err
 	}
 	if len(definitions) == 0 {
-		return nil, fmt.Errorf("chain definition %q not found", chainID)
+		return nil, fmt.Errorf("chain definition %q not found", chainNo)
 	}
 	return definitions[0], nil
+}
+
+// LoadBasicInfra loads a specific basic infrastructure definition from the XDB.
+func (r *xdbRepository) LoadBasicInfra(ctx context.Context, infraNo string) (*glowflow.BasicInfra, error) {
+	dbObj := dbResolver(r.dbConnName)
+	infra, err := daos.LoadBasicInfra(ctx, dbObj, infraNo)
+	if err != nil {
+		return nil, err
+	}
+	if infra == nil || infra.InfraNo == "" {
+		return nil, fmt.Errorf("basic infra %q not found", infraNo)
+	}
+	return r.newBasicInfra(infra)
 }
 
 func (r *xdbRepository) buildChainDefinition(ctx context.Context, chainDefs []*models.ChainDefinition, nodeDefs []*models.NodeDefinition, connDefs []*models.ConnectionDefinition) ([]*glowflow.ChainDefinition, error) {
@@ -135,7 +148,7 @@ func (r *xdbRepository) newChainDefinition(chainDef *models.ChainDefinition) (*g
 		Metadata: glowflow.ChainMetadata{
 			ID:        chainDef.ChainNo,
 			Name:      chainDef.Name,
-			Status:    strconv.Itoa(chainDef.Status),
+			Status:    chainDef.Status,
 			ExtParams: extParams,
 			Layout:    layout,
 		},
@@ -203,6 +216,20 @@ func (r *xdbRepository) buildConnections(chainDef *models.ChainDefinition, connD
 		})
 	}
 	return definitions
+}
+
+func (r *xdbRepository) newBasicInfra(infra *models.BasicInfra) (*glowflow.BasicInfra, error) {
+	extParams, err := decodeExtParams(infra.ExtParams, fmt.Sprintf("basic infra %s extparams", infra.InfraNo))
+	if err != nil {
+		return nil, err
+	}
+	return &glowflow.BasicInfra{
+		InfraNo:   infra.InfraNo,
+		Name:      infra.InfraNo,
+		Type:      infra.InfraType,
+		Desc:      nullStringValue(infra.Desc),
+		ExtParams: extParams,
+	}, nil
 }
 
 func decodeNodeExtParams(nodeDef *models.NodeDefinition) (map[string]any, error) {

@@ -21,3 +21,7 @@ func (r *jsonFileRepository) LoadChainDefinitions(ctx context.Context) ([]*glowf
 func (r *jsonFileRepository) LoadChainDefinition(ctx context.Context, chainID string) (*glowflow.ChainDefinition, error) {
 	return nil, nil
 }
+
+func (r *jsonFileRepository) LoadBasicInfra(ctx context.Context, infraNo string) (*glowflow.BasicInfra, error) {
+	return nil, nil
+}

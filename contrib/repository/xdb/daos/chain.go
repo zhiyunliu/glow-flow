@@ -12,6 +12,10 @@ type chainNoParam struct {
 	ChainNo string `json:"chain_no"`
 }
 
+type infraNoParam struct {
+	InfraNo string `json:"infra_no"`
+}
+
 // LoadChainDefinitions loads the chain definitions from the XDB.
 func LoadChainDefinitions(ctx context.Context, dbObj xdb.Executer) (result []*models.ChainDefinition, err error) {
 	result = make([]*models.ChainDefinition, 0)
@@ -50,5 +54,11 @@ func LoadChainConnections(ctx context.Context, dbObj xdb.Executer) (result []*mo
 func LoadChainConnectionsByChainNo(ctx context.Context, dbObj xdb.Executer, chainNo string) (result []*models.ConnectionDefinition, err error) {
 	result = make([]*models.ConnectionDefinition, 0)
 	err = dbObj.QueryAs(ctx, sqls.LoadChainConnectionsByChainNo, chainNoParam{ChainNo: chainNo}, &result)
+	return
+}
+
+func LoadBasicInfra(ctx context.Context, dbObj xdb.Executer, infraNo string) (result *models.BasicInfra, err error) {
+	result = &models.BasicInfra{}
+	err = dbObj.FirstAs(ctx, sqls.LoadBasicInfra, infraNoParam{InfraNo: infraNo}, result)
 	return
 }

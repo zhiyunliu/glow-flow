@@ -125,7 +125,7 @@ func TestXDBBuildChainDefinitionsSelectsLatestActiveVersionAndAssemblesTopology(
 	if chainA.Version != "10001" {
 		t.Fatalf("expected latest active version 10001, got %q", chainA.Version)
 	}
-	if chainA.Metadata.Name != "Chain A v2" || chainA.Metadata.Status != "1" {
+	if chainA.Metadata.Name != "Chain A v2" || chainA.Metadata.Status != 1 {
 		t.Fatalf("unexpected chain metadata: %+v", chainA.Metadata)
 	}
 	if chainA.Metadata.ExtParams["priority"] != "new" || chainA.Metadata.ExtParams["retries"] != float64(3) {
@@ -233,6 +233,75 @@ func TestXDBLoadChainDefinitionReturnsRequestedLatestActiveChain(t *testing.T) {
 	}
 	if got := dbObj.chainNoInputs; !reflect.DeepEqual(got, []string{"chain-a", "chain-a", "chain-a"}) {
 		t.Fatalf("chain_no inputs = %#v, want three scoped chain-a calls", got)
+	}
+}
+
+func TestXDBLoadBasicInfraReturnsRequestedInfra(t *testing.T) {
+	dbObj := &repositoryExecuter{
+		basicInfras: []*models.BasicInfra{
+			xdbModel[models.BasicInfra](t, map[string]any{
+				"InfraNo":   "infra-a",
+				"InfraType": "database",
+				"ExtParams": `{"dsn":"sqlserver","max_open":10}`,
+				"Desc":      "SQL Server infra",
+			}),
+			xdbModel[models.BasicInfra](t, map[string]any{
+				"InfraNo":   "infra-b",
+				"InfraType": "redis",
+			}),
+		},
+	}
+	original := dbResolver
+	dbResolver = func(name string) gluexdb.Executer {
+		if name != "test-db" {
+			t.Fatalf("db resolver name = %q, want test-db", name)
+		}
+		return dbObj
+	}
+	t.Cleanup(func() { dbResolver = original })
+
+	infra, err := (&xdbRepository{dbConnName: "test-db"}).LoadBasicInfra(context.Background(), "infra-a")
+	if err != nil {
+		t.Fatalf("LoadBasicInfra returned error: %v", err)
+	}
+	if infra.InfraNo != "infra-a" || infra.Type != "database" || infra.Name != "infra-a" || infra.Desc != "SQL Server infra" {
+		t.Fatalf("unexpected basic infra: %+v", infra)
+	}
+	if infra.ExtParams["dsn"] != "sqlserver" || infra.ExtParams["max_open"] != float64(10) {
+		t.Fatalf("unexpected basic infra extparams: %#v", infra.ExtParams)
+	}
+	if got := dbObj.infraNoInputs; !reflect.DeepEqual(got, []string{"infra-a"}) {
+		t.Fatalf("infra_no inputs = %#v, want one scoped infra-a call", got)
+	}
+}
+
+func TestXDBLoadBasicInfraReturnsNotFound(t *testing.T) {
+	dbObj := &repositoryExecuter{}
+	original := dbResolver
+	dbResolver = func(name string) gluexdb.Executer { return dbObj }
+	t.Cleanup(func() { dbResolver = original })
+
+	_, err := (&xdbRepository{dbConnName: "test-db"}).LoadBasicInfra(context.Background(), "missing-infra")
+	if err == nil {
+		t.Fatalf("expected missing basic infra to return an error")
+	}
+}
+
+func TestXDBLoadBasicInfraReturnsErrorForMalformedExtParams(t *testing.T) {
+	dbObj := &repositoryExecuter{
+		basicInfras: []*models.BasicInfra{xdbModel[models.BasicInfra](t, map[string]any{
+			"InfraNo":   "infra-json",
+			"InfraType": "database",
+			"ExtParams": `{`,
+		})},
+	}
+	original := dbResolver
+	dbResolver = func(name string) gluexdb.Executer { return dbObj }
+	t.Cleanup(func() { dbResolver = original })
+
+	_, err := (&xdbRepository{dbConnName: "test-db"}).LoadBasicInfra(context.Background(), "infra-json")
+	if err == nil {
+		t.Fatalf("expected malformed basic infra extparams JSON to return an error")
 	}
 }
 
@@ -506,7 +575,9 @@ type repositoryExecuter struct {
 	chains        []*models.ChainDefinition
 	nodes         []*models.NodeDefinition
 	connections   []*models.ConnectionDefinition
+	basicInfras   []*models.BasicInfra
 	chainNoInputs []string
+	infraNoInputs []string
 }
 
 func (r *repositoryExecuter) Query(ctx context.Context, sql string, input any, opts ...gluexdb.TemplateOption) (gluexdb.Rows, error) {
@@ -534,6 +605,10 @@ func (r *repositoryExecuter) QueryAs(ctx context.Context, query string, input an
 	if chainNo != "" {
 		r.chainNoInputs = append(r.chainNoInputs, chainNo)
 	}
+	infraNo := readInfraNoInput(input)
+	if infraNo != "" {
+		r.infraNoInputs = append(r.infraNoInputs, infraNo)
+	}
 	switch query {
 	case sqls.LoadChainDefinition:
 		*result.(*[]*models.ChainDefinition) = filterXDBChains(r.chains, chainNo)
@@ -547,7 +622,32 @@ func (r *repositoryExecuter) QueryAs(ctx context.Context, query string, input an
 	return nil
 }
 
+func readInfraNoInput(input any) string {
+	value := reflect.ValueOf(input)
+	if value.Kind() == reflect.Pointer {
+		value = value.Elem()
+	}
+	if !value.IsValid() || value.Kind() != reflect.Struct {
+		return ""
+	}
+	field := value.FieldByName("InfraNo")
+	if !field.IsValid() || field.Kind() != reflect.String {
+		return ""
+	}
+	return field.String()
+}
+
 func (r *repositoryExecuter) FirstAs(ctx context.Context, sql string, input any, result any, opts ...gluexdb.TemplateOption) error {
+	infraNo := readInfraNoInput(input)
+	if infraNo != "" {
+		r.infraNoInputs = append(r.infraNoInputs, infraNo)
+	}
+	switch sql {
+	case sqls.LoadBasicInfra:
+		*result.(*models.BasicInfra) = *filterXDBBasicInfra(r.basicInfras, infraNo)
+	default:
+		panic("unexpected query")
+	}
 	return nil
 }
 
@@ -594,4 +694,13 @@ func filterXDBConnections(connections []*models.ConnectionDefinition, chainNo st
 		}
 	}
 	return filtered
+}
+
+func filterXDBBasicInfra(infras []*models.BasicInfra, infraNo string) *models.BasicInfra {
+	for _, infra := range infras {
+		if infra.InfraNo == infraNo {
+			return infra
+		}
+	}
+	return &models.BasicInfra{}
 }
