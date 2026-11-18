@@ -28,7 +28,7 @@ func TestEngineDispatchesLoadedFlowWithData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load flows: %v", err)
 	}
-
+	ctx := context.Background()
 	err = engine.Run()
 	if err != nil {
 		t.Fatalf("run engine: %v", err)
@@ -37,7 +37,7 @@ func TestEngineDispatchesLoadedFlowWithData(t *testing.T) {
 		t.Fatalf("executed after run = %#v, want no dispatch", executed)
 	}
 
-	instanceID, err := engine.Dispatch("flow-a", "payload-a")
+	instanceID, err := engine.Dispatch(ctx, "flow-a", "payload-a")
 	if err != nil {
 		t.Fatalf("dispatch flow-a: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestEngineDispatchesLoadedFlowWithData(t *testing.T) {
 		t.Fatalf("start-a instances = %#v, want %q", instances["start-a"], instanceID)
 	}
 
-	secondInstanceID, err := engine.Dispatch("flow-a", "payload-b")
+	secondInstanceID, err := engine.Dispatch(ctx, "flow-a", "payload-b")
 	if err != nil {
 		t.Fatalf("dispatch flow-a second time: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestEnginePauseResumeFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("register node: %v", err)
 	}
-
+	ctx := context.Background()
 	engine := NewEngine(WithRegistry(registry))
 	err = engine.Load(
 		ChainDefinition{ID: "flow-a", Version: "v1", Nodes: []NodeDefinition{{ID: "start-a", Type: "start"}}},
@@ -99,10 +99,10 @@ func TestEnginePauseResumeFlow(t *testing.T) {
 	if err := engine.Pause("flow-a"); err != nil {
 		t.Fatalf("pause flow-a: %v", err)
 	}
-	if _, err := engine.Dispatch("flow-a", nil); err == nil {
+	if _, err := engine.Dispatch(ctx, "flow-a", nil); err == nil {
 		t.Fatal("dispatch paused flow error is nil, want error")
 	}
-	if _, err := engine.Dispatch("flow-b", nil); err != nil {
+	if _, err := engine.Dispatch(ctx, "flow-b", nil); err != nil {
 		t.Fatalf("dispatch flow-b: %v", err)
 	}
 	if executed["start-a"] != 0 || executed["start-b"] != 1 {
@@ -111,7 +111,7 @@ func TestEnginePauseResumeFlow(t *testing.T) {
 	if err := engine.Resume("flow-a"); err != nil {
 		t.Fatalf("resume flow-a: %v", err)
 	}
-	if _, err := engine.Dispatch("flow-a", nil); err != nil {
+	if _, err := engine.Dispatch(ctx, "flow-a", nil); err != nil {
 		t.Fatalf("dispatch flow-a after resume: %v", err)
 	}
 	if executed["start-a"] != 1 || executed["start-b"] != 1 {
@@ -131,7 +131,7 @@ func TestEngineKeepsVersionsAndDispatchesLatestByFlowID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("register node: %v", err)
 	}
-
+	ctx := context.Background()
 	engine := NewEngine(WithRegistry(registry))
 	err = engine.Load(ChainDefinition{ID: "flow-a", Version: "v1", Nodes: []NodeDefinition{{ID: "start-v1", Type: "start"}}})
 	if err != nil {
@@ -141,7 +141,7 @@ func TestEngineKeepsVersionsAndDispatchesLatestByFlowID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reload flow: %v", err)
 	}
-	instanceID, err := engine.Dispatch("flow-a", nil)
+	instanceID, err := engine.Dispatch(ctx, "flow-a", nil)
 	if err != nil {
 		t.Fatalf("dispatch flow-a: %v", err)
 	}

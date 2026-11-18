@@ -55,7 +55,7 @@ func (e *Engine) Run() error {
 	return nil
 }
 
-func (e *Engine) Dispatch(chainID string, data any) (string, error) {
+func (e *Engine) Dispatch(ctx context.Context, chainID string, data any) (string, error) {
 	series, ok := e.chains.Get(chainID)
 	if !ok {
 		return "", fmt.Errorf("flow not loaded: %s", chainID)
@@ -75,7 +75,7 @@ func (e *Engine) Dispatch(chainID string, data any) (string, error) {
 		return "", err
 	}
 
-	err = e.options.dispatcher.Dispatch(NewContext(context.Background(), instanceID), compiled, data)
+	err = e.options.dispatcher.Dispatch(NewContext(ctx, instanceID), compiled, data)
 	if err != nil {
 		return "", err
 	}
