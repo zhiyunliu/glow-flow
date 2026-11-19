@@ -5,12 +5,14 @@ go 1.27
 require (
 	github.com/alicebob/miniredis/v2 v2.39.0
 	github.com/dop251/goja v0.0.0-20261118204651-8dfece3d1e1d
+	github.com/expr-lang/expr v1.17.8
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/google/uuid v1.6.0
 	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/redis/go-redis/v9 v9.21.0
 	github.com/yuin/gopher-lua v1.1.1
 	github.com/zhiyunliu/glue v0.8.36
+	github.com/zhiyunliu/golibs v0.4.15
 	github.com/zhiyunliu/xbinding v0.1.4
 	go.starlark.net v0.0.0-20261021141710-4f4267fb140d
 	golang.org/x/sync v0.24.0
@@ -69,7 +71,6 @@ require (
 	github.com/urfave/cli v1.22.16 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	github.com/zhiyunliu/alloter v0.2.2 // indirect
-	github.com/zhiyunliu/golibs v0.4.15 // indirect
 	github.com/zhiyunliu/stack v1.10.1 // indirect
 	github.com/zhiyunliu/zerolog v1.1.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
