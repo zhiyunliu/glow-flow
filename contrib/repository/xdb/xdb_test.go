@@ -138,14 +138,14 @@ func TestXDBBuildChainDefinitionsSelectsLatestActiveVersionAndAssemblesTopology(
 		t.Fatalf("expected two nodes for selected version only, got %d", len(chainA.Nodes))
 	}
 	start := findXDBNode(t, chainA.Nodes, "node-start")
-	if start.Type != "start" || start.Name != "Start Node" {
+	if start.NodeType != "start" || start.NodeName != "Start Node" {
 		t.Fatalf("unexpected joined node definition: %+v", start)
 	}
 	if start.ExtParams["timeout"] != float64(30) {
 		t.Fatalf("unexpected node extparams: %#v", start.ExtParams)
 	}
-	if start.Layout != (glowflow.Layout{Icon: "play", X: 1, Y: 2, W: 3, H: 4}) {
-		t.Fatalf("unexpected node layout: %+v", start.Layout)
+	if start.NodeLayout != (glowflow.Layout{Icon: "play", X: 1, Y: 2, W: 3, H: 4}) {
+		t.Fatalf("unexpected node layout: %+v", start.NodeLayout)
 	}
 	if len(chainA.Connections) != 1 {
 		t.Fatalf("expected one connection for selected version only, got %d", len(chainA.Connections))
@@ -455,10 +455,10 @@ func TestXDBBuildChainDefinitionsSortsOutOfOrderRowsAndHandlesEmptyJSON(t *testi
 	if chainA.Nodes[0].ID != "node-a" || chainA.Nodes[1].ID != "node-b" {
 		t.Fatalf("expected nodes sorted by node definition id, got %+v", chainA.Nodes)
 	}
-	if chainA.Nodes[0].ExtParams["source"] != "node" || chainA.Nodes[0].Layout.Icon != "node" {
+	if chainA.Nodes[0].ExtParams["source"] != "node" || chainA.Nodes[0].NodeLayout.Icon != "node" {
 		t.Fatalf("expected node JSON to override definition JSON, got %+v", chainA.Nodes[0])
 	}
-	if chainA.Nodes[1].ExtParams["source"] != "definition" || chainA.Nodes[1].Layout.Icon != "default" {
+	if chainA.Nodes[1].ExtParams["source"] != "definition" || chainA.Nodes[1].NodeLayout.Icon != "default" {
 		t.Fatalf("expected definition JSON fallback, got %+v", chainA.Nodes[1])
 	}
 	if chainA.Connections[0].Type != "success" || chainA.Connections[1].Type != "fallback" {

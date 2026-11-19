@@ -189,11 +189,11 @@ func (r *xdbRepository) buildNodes(chainDef *models.ChainDefinition, nodeDefs []
 			return nil, err
 		}
 		definitions = append(definitions, glowflow.NodeDefinition{
-			ID:        nodeDef.NodeDefNo,
-			Type:      nodeDef.Type,
-			Name:      nodeDef.Name,
-			Layout:    layout,
-			ExtParams: extParams,
+			ID:         nodeDef.NodeDefNo,
+			NodeType:   nodeDef.Type,
+			NodeName:   nodeDef.Name,
+			NodeLayout: layout,
+			ExtParams:  extParams,
 		})
 	}
 	return definitions, nil

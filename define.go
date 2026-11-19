@@ -1,5 +1,7 @@
 package glowflow
 
+import "github.com/zhiyunliu/golibs/xtypes"
+
 type Layout struct {
 	Icon string `json:"icon,omitempty"`
 	H    int    `json:"H,omitempty"` // 高度
@@ -37,11 +39,31 @@ type ChainDefinition struct {
 
 // NodeDefinition is the definition of the node.
 type NodeDefinition struct {
-	ID        string         `json:"id"`
-	Type      string         `json:"type"`
-	Name      string         `json:"name"`
-	Layout    Layout         `json:"layout"`
-	ExtParams map[string]any `json:"extparams,omitempty"`
+	ID         string      `json:"id"`
+	NodeType   string      `json:"type"`
+	NodeName   string      `json:"name"`
+	NodeLayout Layout      `json:"layout"`
+	ExtParams  xtypes.XMap `json:"extparams,omitempty"`
+}
+
+func (n NodeDefinition) Id() string {
+	return n.ID
+}
+
+func (n NodeDefinition) Name() string {
+	return n.NodeName
+}
+
+func (n NodeDefinition) Type() string {
+	return n.NodeType
+}
+
+func (n NodeDefinition) Config() any {
+	return n.ExtParams
+}
+
+func (n NodeDefinition) Layout() Layout {
+	return n.NodeLayout
 }
 
 // ConnectionDefinition is the definition of the connection.

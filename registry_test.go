@@ -6,7 +6,7 @@ func TestRegistryUsesStringNodeTypes(t *testing.T) {
 	nodeType := "custom-task"
 	registry := NewRegistry()
 
-	err := registry.Register(NodeDescriptor{
+	err := registry.Register(&NodeDescriptor{
 		Type: nodeType,
 		Factory: NodeFactoryFunc(func(def NodeDefinition) (CompiledNode, error) {
 			return nil, nil

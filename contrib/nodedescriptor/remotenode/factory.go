@@ -16,6 +16,6 @@ func NewRpcNodeFactory() glowflow.NodeFactory {
 
 func (f *rpcNodeFactory) Build(def glowflow.NodeDefinition) (glowflow.CompiledNode, error) {
 	return &rpcNode{
-		name: def.Name,
+		name: def.NodeName,
 	}, nil
 }

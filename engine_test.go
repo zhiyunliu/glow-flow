@@ -10,10 +10,10 @@ func TestEngineDispatchesLoadedFlowWithData(t *testing.T) {
 	executed := make(map[string]int)
 	inputs := make(map[string][]any)
 	instances := make(map[string][]string)
-	err := registry.Register(NodeDescriptor{
+	err := registry.Register(&NodeDescriptor{
 		Type: "start",
 		Factory: NodeFactoryFunc(func(def NodeDefinition) (CompiledNode, error) {
-			return &recordingEngineNode{id: def.ID, nodeType: def.Type, start: true, executed: executed, inputs: inputs, instances: instances}, nil
+			return &recordingEngineNode{id: def.ID, nodeType: def.NodeType, start: true, executed: executed, inputs: inputs, instances: instances}, nil
 		}),
 	})
 	if err != nil {
@@ -22,8 +22,8 @@ func TestEngineDispatchesLoadedFlowWithData(t *testing.T) {
 
 	engine := NewEngine(WithRegistry(registry))
 	err = engine.Load(
-		ChainDefinition{ID: "flow-a", Version: "v1", Nodes: []NodeDefinition{{ID: "start-a", Type: "start"}}},
-		ChainDefinition{ID: "flow-b", Version: "v1", Nodes: []NodeDefinition{{ID: "start-b", Type: "start"}}},
+		ChainDefinition{ID: "flow-a", Version: "v1", Nodes: []NodeDefinition{{ID: "start-a", NodeType: "start"}}},
+		ChainDefinition{ID: "flow-b", Version: "v1", Nodes: []NodeDefinition{{ID: "start-b", NodeType: "start"}}},
 	)
 	if err != nil {
 		t.Fatalf("load flows: %v", err)
@@ -78,10 +78,10 @@ func TestEngineDispatchesLoadedFlowWithData(t *testing.T) {
 func TestEnginePauseResumeFlow(t *testing.T) {
 	registry := NewRegistry()
 	executed := make(map[string]int)
-	err := registry.Register(NodeDescriptor{
+	err := registry.Register(&NodeDescriptor{
 		Type: "start",
 		Factory: NodeFactoryFunc(func(def NodeDefinition) (CompiledNode, error) {
-			return &recordingEngineNode{id: def.ID, nodeType: def.Type, start: true, executed: executed}, nil
+			return &recordingEngineNode{id: def.ID, nodeType: def.NodeType, start: true, executed: executed}, nil
 		}),
 	})
 	if err != nil {
@@ -90,8 +90,8 @@ func TestEnginePauseResumeFlow(t *testing.T) {
 	ctx := context.Background()
 	engine := NewEngine(WithRegistry(registry))
 	err = engine.Load(
-		ChainDefinition{ID: "flow-a", Version: "v1", Nodes: []NodeDefinition{{ID: "start-a", Type: "start"}}},
-		ChainDefinition{ID: "flow-b", Version: "v1", Nodes: []NodeDefinition{{ID: "start-b", Type: "start"}}},
+		ChainDefinition{ID: "flow-a", Version: "v1", Nodes: []NodeDefinition{{ID: "start-a", NodeType: "start"}}},
+		ChainDefinition{ID: "flow-b", Version: "v1", Nodes: []NodeDefinition{{ID: "start-b", NodeType: "start"}}},
 	)
 	if err != nil {
 		t.Fatalf("load flows: %v", err)
@@ -122,10 +122,10 @@ func TestEnginePauseResumeFlow(t *testing.T) {
 func TestEngineKeepsVersionsAndDispatchesLatestByFlowID(t *testing.T) {
 	registry := NewRegistry()
 	executed := make(map[string]int)
-	err := registry.Register(NodeDescriptor{
+	err := registry.Register(&NodeDescriptor{
 		Type: "start",
 		Factory: NodeFactoryFunc(func(def NodeDefinition) (CompiledNode, error) {
-			return &recordingEngineNode{id: def.ID, nodeType: def.Type, start: true, executed: executed}, nil
+			return &recordingEngineNode{id: def.ID, nodeType: def.NodeType, start: true, executed: executed}, nil
 		}),
 	})
 	if err != nil {
@@ -133,11 +133,11 @@ func TestEngineKeepsVersionsAndDispatchesLatestByFlowID(t *testing.T) {
 	}
 	ctx := context.Background()
 	engine := NewEngine(WithRegistry(registry))
-	err = engine.Load(ChainDefinition{ID: "flow-a", Version: "v1", Nodes: []NodeDefinition{{ID: "start-v1", Type: "start"}}})
+	err = engine.Load(ChainDefinition{ID: "flow-a", Version: "v1", Nodes: []NodeDefinition{{ID: "start-v1", NodeType: "start"}}})
 	if err != nil {
 		t.Fatalf("load flow: %v", err)
 	}
-	err = engine.Reload(ChainDefinition{ID: "flow-a", Version: "v2", Nodes: []NodeDefinition{{ID: "start-v2", Type: "start"}}})
+	err = engine.Reload(ChainDefinition{ID: "flow-a", Version: "v2", Nodes: []NodeDefinition{{ID: "start-v2", NodeType: "start"}}})
 	if err != nil {
 		t.Fatalf("reload flow: %v", err)
 	}

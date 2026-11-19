@@ -61,9 +61,9 @@ func (c *chainCompiler) Compile(def ChainDefinition, registry Registry) (*Compil
 		if _, exists := compiled.Nodes[nodeDef.ID]; exists {
 			return nil, fmt.Errorf("duplicate node id: %s", nodeDef.ID)
 		}
-		desc, ok := registry.Get(nodeDef.Type)
+		desc, ok := registry.Get(nodeDef.NodeType)
 		if !ok {
-			return nil, fmt.Errorf("node type is not registered: %s", nodeDef.Type)
+			return nil, fmt.Errorf("node type is not registered: %s", nodeDef.NodeType)
 		}
 		node, err := desc.Factory.Build(nodeDef)
 		if err != nil {

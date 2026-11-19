@@ -14,6 +14,6 @@ func NewLocalNodeFactory() glowflow.NodeFactory {
 
 func (f *localNodeFactory) Build(def glowflow.NodeDefinition) (glowflow.CompiledNode, error) {
 	return &localNode{
-		name: def.Name,
+		name: def.NodeName,
 	}, nil
 }

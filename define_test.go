@@ -19,7 +19,7 @@ func TestChainDefinitionPreservesJSONShape(t *testing.T) {
 			Layout: Layout{Icon: "bolt", H: 1, X: 2, Y: 3, W: 4},
 		},
 		Endpoints: []EndpointDefinition{{ID: "endpoint-a", Name: "Endpoint A"}},
-		Nodes:     []NodeDefinition{{ID: "node-a", Type: "start", Name: "Start"}},
+		Nodes:     []NodeDefinition{{ID: "node-a", NodeType: "start", NodeName: "Start"}},
 		Connections: []ConnectionDefinition{{
 			FromID: "node-a",
 			ToID:   "node-b",
@@ -65,9 +65,9 @@ func TestChainDefinitionPreservesJSONShape(t *testing.T) {
 
 func TestNodeDefinitionTypeUsesStringNodeTypeValues(t *testing.T) {
 	for _, nodeType := range []string{"start", "task", "end"} {
-		def := NodeDefinition{Type: nodeType}
-		if def.Type != nodeType {
-			t.Fatalf("node definition type = %q, want %q", def.Type, nodeType)
+		def := NodeDefinition{NodeType: nodeType}
+		if def.NodeType != nodeType {
+			t.Fatalf("node definition type = %q, want %q", def.NodeType, nodeType)
 		}
 	}
 }

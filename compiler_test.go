@@ -25,19 +25,19 @@ func (n *testNode) NextNodes() []CompiledNode                            { retur
 
 func TestFlowCompilerBuildsRelationGraph(t *testing.T) {
 	registry := NewRegistry()
-	err := registry.Register(NodeDescriptor{
+	err := registry.Register(&NodeDescriptor{
 		Type: "start",
 		Factory: NodeFactoryFunc(func(def NodeDefinition) (CompiledNode, error) {
-			return &testNode{id: def.ID, name: def.Name, nodeTyp: def.Type, start: true, config: def.ExtParams}, nil
+			return &testNode{id: def.ID, name: def.NodeName, nodeTyp: def.NodeType, start: true, config: def.ExtParams}, nil
 		}),
 	})
 	if err != nil {
 		t.Fatalf("register start node: %v", err)
 	}
-	err = registry.Register(NodeDescriptor{
+	err = registry.Register(&NodeDescriptor{
 		Type: "task",
 		Factory: NodeFactoryFunc(func(def NodeDefinition) (CompiledNode, error) {
-			return &testNode{id: def.ID, name: def.Name, nodeTyp: def.Type, config: def.ExtParams}, nil
+			return &testNode{id: def.ID, name: def.NodeName, nodeTyp: def.NodeType, config: def.ExtParams}, nil
 		}),
 	})
 	if err != nil {
@@ -48,9 +48,9 @@ func TestFlowCompilerBuildsRelationGraph(t *testing.T) {
 		ID:      "flow-a",
 		Version: "v1",
 		Nodes: []NodeDefinition{
-			{ID: "start", Name: "start", Type: "start"},
-			{ID: "true-node", Name: "true", Type: "task"},
-			{ID: "false-node", Name: "false", Type: "task"},
+			{ID: "start", NodeName: "start", NodeType: "start"},
+			{ID: "true-node", NodeName: "true", NodeType: "task"},
+			{ID: "false-node", NodeName: "false", NodeType: "task"},
 		},
 		Connections: []ConnectionDefinition{
 			{FromID: "start", ToID: "true-node", Type: "True"},
@@ -82,7 +82,7 @@ func TestChainCompilerRejectsUnknownNodeType(t *testing.T) {
 		ID:      "flow-a",
 		Version: "v1",
 		Nodes: []NodeDefinition{
-			{ID: "start", Name: "start", Type: "start"},
+			{ID: "start", NodeName: "start", NodeType: "start"},
 		},
 	}, NewRegistry())
 	if err == nil {

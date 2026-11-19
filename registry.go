@@ -22,14 +22,14 @@ type NodeDescriptor struct {
 }
 
 type Registry interface {
-	Register(desc NodeDescriptor) error
-	Get(nodeType string) (NodeDescriptor, bool)
-	List() []NodeDescriptor
+	Register(desc *NodeDescriptor) error
+	Get(nodeType string) (*NodeDescriptor, bool)
+	List() []*NodeDescriptor
 }
 
 type registry struct {
 	mu    sync.RWMutex
-	nodes map[string]NodeDescriptor
+	nodes map[string]*NodeDescriptor
 }
 
 var (
@@ -37,10 +37,10 @@ var (
 )
 
 func NewRegistry() Registry {
-	return &registry{nodes: make(map[string]NodeDescriptor)}
+	return &registry{nodes: make(map[string]*NodeDescriptor)}
 }
 
-func (r *registry) Register(desc NodeDescriptor) error {
+func (r *registry) Register(desc *NodeDescriptor) error {
 	if desc.Type == "" {
 		return fmt.Errorf("node type is empty")
 	}
@@ -57,17 +57,17 @@ func (r *registry) Register(desc NodeDescriptor) error {
 	return nil
 }
 
-func (r *registry) Get(nodeType string) (NodeDescriptor, bool) {
+func (r *registry) Get(nodeType string) (*NodeDescriptor, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	desc, ok := r.nodes[nodeType]
 	return desc, ok
 }
 
-func (r *registry) List() []NodeDescriptor {
+func (r *registry) List() []*NodeDescriptor {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	descriptors := make([]NodeDescriptor, 0, len(r.nodes))
+	descriptors := make([]*NodeDescriptor, 0, len(r.nodes))
 	for _, desc := range r.nodes {
 		descriptors = append(descriptors, desc)
 	}
