@@ -9,7 +9,10 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/redis/go-redis/v9 v9.21.0
+	github.com/yuin/gopher-lua v1.1.1
 	github.com/zhiyunliu/glue v0.8.36
+	github.com/zhiyunliu/xbinding v0.1.4
+	go.starlark.net v0.0.0-20261021141710-4f4267fb140d
 	golang.org/x/sync v0.24.0
 )
 
@@ -64,12 +67,10 @@ require (
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/urfave/cli v1.22.16 // indirect
-	github.com/yuin/gopher-lua v1.1.1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	github.com/zhiyunliu/alloter v0.2.2 // indirect
 	github.com/zhiyunliu/golibs v0.4.15 // indirect
 	github.com/zhiyunliu/stack v1.10.1 // indirect
-	github.com/zhiyunliu/xbinding v0.1.4 // indirect
 	github.com/zhiyunliu/zerolog v1.1.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.44.0 // indirect
