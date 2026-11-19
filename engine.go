@@ -68,14 +68,13 @@ func (e *Engine) Dispatch(ctx context.Context, chainID string, data any) (string
 	if !ok {
 		return "", fmt.Errorf("flow version not loaded: %s@%s", chainID, version)
 	}
-	compiled := flow.compiled
 
 	instanceID, err := newInstanceID()
 	if err != nil {
 		return "", err
 	}
 
-	err = e.options.dispatcher.Dispatch(NewContext(ctx, instanceID), compiled, data)
+	err = e.options.dispatcher.Dispatch(NewContext(ctx, instanceID), flow.compiled, data)
 	if err != nil {
 		return "", err
 	}

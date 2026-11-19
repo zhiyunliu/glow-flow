@@ -12,7 +12,7 @@ func TestEngineDispatchesLoadedFlowWithData(t *testing.T) {
 	instances := make(map[string][]string)
 	err := registry.Register(NodeDescriptor{
 		Type: "start",
-		Factory: nodeFactoryFunc(func(def NodeDefinition) (CompiledNode, error) {
+		Factory: NodeFactoryFunc(func(def NodeDefinition) (CompiledNode, error) {
 			return &recordingEngineNode{id: def.ID, nodeType: def.Type, start: true, executed: executed, inputs: inputs, instances: instances}, nil
 		}),
 	})
@@ -80,7 +80,7 @@ func TestEnginePauseResumeFlow(t *testing.T) {
 	executed := make(map[string]int)
 	err := registry.Register(NodeDescriptor{
 		Type: "start",
-		Factory: nodeFactoryFunc(func(def NodeDefinition) (CompiledNode, error) {
+		Factory: NodeFactoryFunc(func(def NodeDefinition) (CompiledNode, error) {
 			return &recordingEngineNode{id: def.ID, nodeType: def.Type, start: true, executed: executed}, nil
 		}),
 	})
@@ -124,7 +124,7 @@ func TestEngineKeepsVersionsAndDispatchesLatestByFlowID(t *testing.T) {
 	executed := make(map[string]int)
 	err := registry.Register(NodeDescriptor{
 		Type: "start",
-		Factory: nodeFactoryFunc(func(def NodeDefinition) (CompiledNode, error) {
+		Factory: NodeFactoryFunc(func(def NodeDefinition) (CompiledNode, error) {
 			return &recordingEngineNode{id: def.ID, nodeType: def.Type, start: true, executed: executed}, nil
 		}),
 	})

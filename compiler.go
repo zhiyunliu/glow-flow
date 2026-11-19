@@ -6,6 +6,7 @@ import (
 
 const DefaultRelationType = "default"
 
+// ChainCompiler is an interface for compiling chain definitions into executable chains.
 type ChainCompiler interface {
 	Compile(def ChainDefinition, registry Registry) (*CompiledChain, error)
 }
@@ -16,6 +17,7 @@ var (
 	DefaultChainCompiler = NewChainCompiler()
 )
 
+// NewChainCompiler creates a new instance of the default chain compiler.
 func NewChainCompiler() ChainCompiler {
 	return &chainCompiler{}
 }
@@ -39,7 +41,7 @@ func (c *CompiledChain) NextNodes(nodeID string, relationType string) []Compiled
 	if len(nodes) == 0 && relationType != DefaultRelationType {
 		nodes = byRelation[DefaultRelationType]
 	}
-	return append([]CompiledNode(nil), nodes...)
+	return append([]CompiledNode{}, nodes...)
 }
 
 func (c *chainCompiler) Compile(def ChainDefinition, registry Registry) (*CompiledChain, error) {

@@ -29,15 +29,13 @@ func (d *dispatcher) Dispatch(ctx Context, flow *CompiledChain, data any) error 
 		return fmt.Errorf("compiled chain is nil")
 	}
 	var asyncGroup errgroup.Group
-
 	for _, node := range flow.StartNodes {
-		asyncGroup.Go(d.asyncCall(&asyncGroup, ctx, flow, node, data))
+		asyncGroup.Go(d.asyncCall(ctx, &asyncGroup, flow, node, data))
 	}
-
-	return asyncGroup.Wait()
+	return nil
 }
 
-func (d *dispatcher) dispatchNode(asyncGroup *errgroup.Group, ctx Context, flow *CompiledChain, node CompiledNode, data any) error {
+func (d *dispatcher) dispatchNode(ctx Context, asyncGroup *errgroup.Group, flow *CompiledChain, node CompiledNode, data any) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -51,14 +49,14 @@ func (d *dispatcher) dispatchNode(asyncGroup *errgroup.Group, ctx Context, flow 
 
 	nextNodes := flow.NextNodes(node.Id(), result.RelationType)
 	for _, nextNode := range nextNodes {
-		asyncGroup.Go(d.asyncCall(asyncGroup, ctx, flow, nextNode, result.Data))
+		asyncGroup.Go(d.asyncCall(ctx, asyncGroup, flow, nextNode, result.Data))
 	}
 	return nil
 }
 
-func (d *dispatcher) asyncCall(asyncGroup *errgroup.Group, ctx Context, flow *CompiledChain, node CompiledNode, data any) func() error {
+func (d *dispatcher) asyncCall(ctx Context, asyncGroup *errgroup.Group, flow *CompiledChain, node CompiledNode, data any) func() error {
 	return func() error {
-		return d.dispatchNode(asyncGroup, ctx, flow, node, data)
+		return d.dispatchNode(ctx, asyncGroup, flow, node, data)
 	}
 }
 

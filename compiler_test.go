@@ -27,7 +27,7 @@ func TestFlowCompilerBuildsRelationGraph(t *testing.T) {
 	registry := NewRegistry()
 	err := registry.Register(NodeDescriptor{
 		Type: "start",
-		Factory: nodeFactoryFunc(func(def NodeDefinition) (CompiledNode, error) {
+		Factory: NodeFactoryFunc(func(def NodeDefinition) (CompiledNode, error) {
 			return &testNode{id: def.ID, name: def.Name, nodeTyp: def.Type, start: true, config: def.ExtParams}, nil
 		}),
 	})
@@ -36,7 +36,7 @@ func TestFlowCompilerBuildsRelationGraph(t *testing.T) {
 	}
 	err = registry.Register(NodeDescriptor{
 		Type: "task",
-		Factory: nodeFactoryFunc(func(def NodeDefinition) (CompiledNode, error) {
+		Factory: NodeFactoryFunc(func(def NodeDefinition) (CompiledNode, error) {
 			return &testNode{id: def.ID, name: def.Name, nodeTyp: def.Type, config: def.ExtParams}, nil
 		}),
 	})

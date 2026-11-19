@@ -5,9 +5,9 @@ import (
 	"sync"
 )
 
-type nodeFactoryFunc func(def NodeDefinition) (CompiledNode, error)
+type NodeFactoryFunc func(def NodeDefinition) (CompiledNode, error)
 
-func (f nodeFactoryFunc) Build(def NodeDefinition) (CompiledNode, error) {
+func (f NodeFactoryFunc) Build(def NodeDefinition) (CompiledNode, error) {
 	return f(def)
 }
 
