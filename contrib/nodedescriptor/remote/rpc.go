@@ -1,4 +1,4 @@
-package rpcnode
+package remote
 
 import glowflow "github.com/zhiyunliu/glow-flow"
 

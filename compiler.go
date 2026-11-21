@@ -8,7 +8,7 @@ const DefaultRelationType = "default"
 
 // ChainCompiler is an interface for compiling chain definitions into executable chains.
 type ChainCompiler interface {
-	Compile(def ChainDefinition, registry Registry) (*CompiledChain, error)
+	Compile(def ChainDefinition, registry NodeRegistry) (*CompiledChain, error)
 }
 
 type chainCompiler struct{}
@@ -44,7 +44,7 @@ func (c *CompiledChain) NextNodes(nodeID string, relationType string) []Compiled
 	return append([]CompiledNode{}, nodes...)
 }
 
-func (c *chainCompiler) Compile(def ChainDefinition, registry Registry) (*CompiledChain, error) {
+func (c *chainCompiler) Compile(def ChainDefinition, registry NodeRegistry) (*CompiledChain, error) {
 	if registry == nil {
 		return nil, fmt.Errorf("registry is nil")
 	}

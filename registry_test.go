@@ -4,7 +4,7 @@ import "testing"
 
 func TestRegistryUsesStringNodeTypes(t *testing.T) {
 	nodeType := "custom-task"
-	registry := NewRegistry()
+	registry := NewNodeRegistry()
 
 	err := registry.Register(&NodeDescriptor{
 		Type: nodeType,

@@ -3,7 +3,7 @@ package glowflow
 type options struct {
 	dataRepository DataRepository
 	stateStorage   StateStorage
-	registry       Registry
+	registry       NodeRegistry
 	compiler       ChainCompiler
 	dispatcher     Dispatcher
 }
@@ -25,7 +25,7 @@ func WithStateStorage(storage StateStorage) Option {
 	}
 }
 
-func WithRegistry(registry Registry) Option {
+func WithRegistry(registry NodeRegistry) Option {
 	return func(o *options) {
 		o.registry = registry
 	}

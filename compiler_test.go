@@ -24,7 +24,7 @@ func (n *testNode) Execute(ctx Context, data any) (ExecuteResult, error) { retur
 func (n *testNode) NextNodes() []CompiledNode                            { return nil }
 
 func TestFlowCompilerBuildsRelationGraph(t *testing.T) {
-	registry := NewRegistry()
+	registry := NewNodeRegistry()
 	err := registry.Register(&NodeDescriptor{
 		Type: "start",
 		Factory: NodeFactoryFunc(func(def NodeDefinition) (CompiledNode, error) {
@@ -84,7 +84,7 @@ func TestChainCompilerRejectsUnknownNodeType(t *testing.T) {
 		Nodes: []NodeDefinition{
 			{ID: "start", NodeName: "start", NodeType: "start"},
 		},
-	}, NewRegistry())
+	}, NewNodeRegistry())
 	if err == nil {
 		t.Fatal("compile error is nil, want unknown node type error")
 	}

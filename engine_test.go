@@ -6,7 +6,7 @@ import (
 )
 
 func TestEngineDispatchesLoadedFlowWithData(t *testing.T) {
-	registry := NewRegistry()
+	registry := NewNodeRegistry()
 	executed := make(map[string]int)
 	inputs := make(map[string][]any)
 	instances := make(map[string][]string)
@@ -76,7 +76,7 @@ func TestEngineDispatchesLoadedFlowWithData(t *testing.T) {
 }
 
 func TestEnginePauseResumeFlow(t *testing.T) {
-	registry := NewRegistry()
+	registry := NewNodeRegistry()
 	executed := make(map[string]int)
 	err := registry.Register(&NodeDescriptor{
 		Type: "start",
@@ -120,7 +120,7 @@ func TestEnginePauseResumeFlow(t *testing.T) {
 }
 
 func TestEngineKeepsVersionsAndDispatchesLatestByFlowID(t *testing.T) {
-	registry := NewRegistry()
+	registry := NewNodeRegistry()
 	executed := make(map[string]int)
 	err := registry.Register(&NodeDescriptor{
 		Type: "start",

@@ -2,6 +2,7 @@ package glowflow
 
 type ExecuteResult struct {
 	RelationType string
+	Streamable   bool
 	Data         any
 	Error        error
 }

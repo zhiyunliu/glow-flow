@@ -21,7 +21,7 @@ type NodeDescriptor struct {
 	DefaultConfig any
 }
 
-type Registry interface {
+type NodeRegistry interface {
 	Register(desc *NodeDescriptor) error
 	Get(nodeType string) (*NodeDescriptor, bool)
 	List() []*NodeDescriptor
@@ -33,10 +33,10 @@ type registry struct {
 }
 
 var (
-	DefaultRegistry = NewRegistry()
+	DefaultRegistry = NewNodeRegistry()
 )
 
-func NewRegistry() Registry {
+func NewNodeRegistry() NodeRegistry {
 	return &registry{nodes: make(map[string]*NodeDescriptor)}
 }
 

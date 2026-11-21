@@ -9,6 +9,6 @@ const (
 	VarSuffix = "}"
 )
 
-func CheckHasVar(str string) bool {
+func CheckTemplateHasVar(str string) bool {
 	return strings.Contains(str, VarPrefix) && strings.Contains(str, VarSuffix)
 }

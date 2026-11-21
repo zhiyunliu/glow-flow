@@ -11,8 +11,8 @@ require (
 	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/redis/go-redis/v9 v9.21.0
 	github.com/yuin/gopher-lua v1.1.1
-	github.com/zhiyunliu/glue v0.8.36
-	github.com/zhiyunliu/golibs v0.4.15
+	github.com/zhiyunliu/glue v0.8.37
+	github.com/zhiyunliu/golibs v0.4.17
 	github.com/zhiyunliu/xbinding v0.1.4
 	go.starlark.net v0.0.0-20261021141710-4f4267fb140d
 	golang.org/x/sync v0.24.0
