@@ -1,10 +1,10 @@
 package action
 
-import glowflow "github.com/zhiyunliu/glow-flow"
-
+/*
+rpc远程调用
+使用
+obj:=glue.RPC("")
+res,err:= obj.Request(ctx,service,msg.data)
+*/
 type nodeRpcCall struct {
-}
-
-func (n *nodeRpcCall) Call[T any](ctx glowflow.Context, method string, args ...any) {
-
 }

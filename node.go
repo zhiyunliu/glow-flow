@@ -19,3 +19,5 @@ type CompiledNode interface {
 	Node
 	Execute(ctx Context, msg *Message) (ExecuteResult, error)
 }
+
+type NodeCall func(ctx Context, msg *Message) (ExecuteResult, error)
