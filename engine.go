@@ -73,8 +73,9 @@ func (e *Engine) Dispatch(ctx context.Context, chainID string, data any) (string
 	if err != nil {
 		return "", err
 	}
+	msg := NewMessage(instanceID, data)
 
-	err = e.options.dispatcher.Dispatch(NewContext(ctx, instanceID), flow.compiled, data)
+	err = e.options.dispatcher.Dispatch(NewContext(ctx, instanceID), flow.compiled, msg)
 	if err != nil {
 		return "", err
 	}

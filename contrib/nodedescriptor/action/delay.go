@@ -12,11 +12,11 @@ type delayNode struct {
 	delay time.Duration
 }
 
-func (n *delayNode) Execute(ctx glowflow.Context, data any) (glowflow.ExecuteResult, error) {
+func (n *delayNode) Execute(ctx glowflow.Context, msg *glowflow.Message) (glowflow.ExecuteResult, error) {
 	time.Sleep(n.delay)
 	return glowflow.ExecuteResult{
 		RelationType: relationtype.Success,
-		Data:         data,
+		Msg:          msg,
 	}, nil
 }
 

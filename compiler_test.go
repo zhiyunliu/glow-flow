@@ -14,14 +14,14 @@ type testNode struct {
 	result  ExecuteResult
 }
 
-func (n *testNode) Id() string                                           { return n.id }
-func (n *testNode) Name() string                                         { return n.name }
-func (n *testNode) Type() string                                         { return n.nodeTyp }
-func (n *testNode) IsStartNode() bool                                    { return n.start }
-func (n *testNode) Config() any                                          { return n.config }
-func (n *testNode) Layout() Layout                                       { return n.layout }
-func (n *testNode) Execute(ctx Context, data any) (ExecuteResult, error) { return n.result, nil }
-func (n *testNode) NextNodes() []CompiledNode                            { return nil }
+func (n *testNode) Id() string                                               { return n.id }
+func (n *testNode) Name() string                                             { return n.name }
+func (n *testNode) Type() string                                             { return n.nodeTyp }
+func (n *testNode) IsStartNode() bool                                        { return n.start }
+func (n *testNode) Config() any                                              { return n.config }
+func (n *testNode) Layout() Layout                                           { return n.layout }
+func (n *testNode) Execute(ctx Context, msg *Message) (ExecuteResult, error) { return n.result, nil }
+func (n *testNode) NextNodes() []CompiledNode                                { return nil }
 
 func TestFlowCompilerBuildsRelationGraph(t *testing.T) {
 	registry := NewNodeRegistry()

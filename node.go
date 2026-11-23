@@ -3,7 +3,7 @@ package glowflow
 type ExecuteResult struct {
 	RelationType string
 	Streamable   bool
-	Data         any
+	Msg          *Message
 	Error        error
 }
 
@@ -17,5 +17,5 @@ type Node interface {
 
 type CompiledNode interface {
 	Node
-	Execute(ctx Context, data any) (ExecuteResult, error)
+	Execute(ctx Context, msg *Message) (ExecuteResult, error)
 }

@@ -168,15 +168,15 @@ func (n *recordingEngineNode) Type() string      { return n.nodeType }
 func (n *recordingEngineNode) IsStartNode() bool { return n.start }
 func (n *recordingEngineNode) Config() any       { return nil }
 func (n *recordingEngineNode) Layout() Layout    { return Layout{} }
-func (n *recordingEngineNode) Execute(ctx Context, data any) (ExecuteResult, error) {
+func (n *recordingEngineNode) Execute(ctx Context, msg *Message) (ExecuteResult, error) {
 	n.executed[n.id]++
 	if n.inputs != nil {
-		n.inputs[n.id] = append(n.inputs[n.id], data)
+		n.inputs[n.id] = append(n.inputs[n.id], msg.Data)
 	}
 	if n.instances != nil {
 		n.instances[n.id] = append(n.instances[n.id], ctx.GetInstanceID())
 	}
-	return ExecuteResult{Data: data}, nil
+	return ExecuteResult{Msg: msg}, nil
 }
 func (n *recordingEngineNode) NextNodes() []CompiledNode { return nil }
 

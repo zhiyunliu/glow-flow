@@ -22,8 +22,8 @@ func (n *recordingNode) Type() string      { return n.nodeType }
 func (n *recordingNode) IsStartNode() bool { return n.start }
 func (n *recordingNode) Config() any       { return nil }
 func (n *recordingNode) Layout() Layout    { return Layout{} }
-func (n *recordingNode) Execute(ctx Context, data any) (ExecuteResult, error) {
-	n.inputs = append(n.inputs, data)
+func (n *recordingNode) Execute(ctx Context, msg *Message) (ExecuteResult, error) {
+	n.inputs = append(n.inputs, msg.Data)
 	n.instances = append(n.instances, ctx.GetInstanceID())
 	return n.result, n.execError
 }
@@ -37,7 +37,7 @@ func TestDispatcherRoutesByRelationType(t *testing.T) {
 		start:    true,
 		result: ExecuteResult{
 			RelationType: "True",
-			Data:         "payload-for-next",
+			Msg:          NewMessage("instance-1", "payload-for-next"),
 		},
 	}
 	trueNode := &recordingNode{id: "true-node", name: "true", nodeType: "task"}
@@ -57,7 +57,7 @@ func TestDispatcherRoutesByRelationType(t *testing.T) {
 		StartNodes: []CompiledNode{start},
 	}
 
-	err := NewDispatcher().Dispatch(NewContext(context.Background(), "instance-1"), flow, "input")
+	err := NewDispatcher().Dispatch(NewContext(context.Background(), "instance-1"), flow, NewMessage("instance-1", "input"))
 	if err != nil {
 		t.Fatalf("dispatch: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestDispatcherUsesDefaultRelationFallback(t *testing.T) {
 		start:    true,
 		result: ExecuteResult{
 			RelationType: "unknown",
-			Data:         42,
+			Msg:          NewMessage("instance-1", 42),
 		},
 	}
 	defaultNode := &recordingNode{id: "default-node", name: "default", nodeType: "task"}
@@ -98,7 +98,7 @@ func TestDispatcherUsesDefaultRelationFallback(t *testing.T) {
 		StartNodes: []CompiledNode{start},
 	}
 
-	err := NewDispatcher().Dispatch(NewContext(context.Background(), "instance-1"), flow, "input")
+	err := NewDispatcher().Dispatch(NewContext(context.Background(), "instance-1"), flow, NewMessage("instance-1", "input"))
 	if err != nil {
 		t.Fatalf("dispatch: %v", err)
 	}
@@ -112,11 +112,11 @@ func TestDispatcherReturnsDifferentInstanceIDPerDispatch(t *testing.T) {
 	flow := &CompiledChain{StartNodes: []CompiledNode{start}}
 	dispatcher := NewDispatcher()
 
-	err := dispatcher.Dispatch(NewContext(context.Background(), "instance-1"), flow, "first")
+	err := dispatcher.Dispatch(NewContext(context.Background(), "instance-1"), flow, NewMessage("instance-1", "first"))
 	if err != nil {
 		t.Fatalf("dispatch first: %v", err)
 	}
-	err = dispatcher.Dispatch(NewContext(context.Background(), "instance-2"), flow, "second")
+	err = dispatcher.Dispatch(NewContext(context.Background(), "instance-2"), flow, NewMessage("instance-2", "second"))
 	if err != nil {
 		t.Fatalf("dispatch second: %v", err)
 	}

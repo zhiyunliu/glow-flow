@@ -26,55 +26,59 @@ type xdbExecCallback func(ctx context.Context, node *xdbNode, dbObj xdb.Executer
 var (
 	xdbMethods = map[string]xdbExecCallback{
 		"queryas": func(ctx context.Context, node *xdbNode, dbObj xdb.Executer, sql string, data any) (result any, err error) {
-			result = &[]xtypes.XMap{}
+			result = []xtypes.XMap{}
 			if node.stream {
 				dataChan := make(chan *xtypes.XMap)
-				result = xdb.NewStreamChan(dataChan)
+				go func() {
+					result = xdb.NewStreamChan(dataChan)
+					err = dbObj.QueryAs(ctx, sql, data, result)
+				}()
+				result = glowflow.NewStreamableWrapper(dataChan)
+				return
 			}
-			err = dbObj.QueryAs(ctx, sql, data, result)
+			err = dbObj.QueryAs(ctx, sql, data, &result)
 			return
 		},
 		"firstas": func(ctx context.Context, node *xdbNode, dbObj xdb.Executer, sql string, data any) (result any, err error) {
-
 			result = &xtypes.XMap{}
-			if node.stream {
-				dataChan := make(chan *xtypes.XMap)
-				result = xdb.NewStreamChan(dataChan)
-			}
 			err = dbObj.FirstAs(ctx, sql, data, result)
+			node.stream = false
 			return
 		},
 		"exec": func(ctx context.Context, node *xdbNode, dbObj xdb.Executer, sql string, data any) (result any, err error) {
+			node.stream = false
 			result, err = dbObj.Exec(ctx, sql, data)
 			return
 		},
 	}
 )
 
-func (n *xdbNode) Execute(ctx glowflow.Context, data any) (glowflow.ExecuteResult, error) {
+func (n *xdbNode) Execute(ctx glowflow.Context, msg *glowflow.Message) (glowflow.ExecuteResult, error) {
 
 	xdbExec, ok := n.xdbMethods[n.execMethod]
 	if !ok {
 		return glowflow.ExecuteResult{
 			RelationType: relationtype.Failure,
-			Data:         nil,
+			Msg:          msg,
 		}, nil
 	}
 
 	dbObj := glue.DB(n.dbconn)
-	result, err := xdbExec(ctx, n, dbObj, n.execSql, data)
+	result, err := xdbExec(ctx, n, dbObj, n.execSql, msg.Data)
 	if err != nil {
 		return glowflow.ExecuteResult{
 			RelationType: relationtype.Failure,
 			Streamable:   n.stream,
-			Data:         nil,
+			Msg:          msg,
 		}, nil
 	}
 
+	//todo:
+	msg.Data = result
 	return glowflow.ExecuteResult{
 		RelationType: relationtype.Success,
 		Streamable:   n.stream,
-		Data:         result,
+		Msg:          msg,
 	}, nil
 }
 

@@ -18,10 +18,10 @@ func (n *rpcNode) Type() string {
 	return "rpc"
 }
 
-func (n *rpcNode) Execute(ctx glowflow.Context, data any) (glowflow.ExecuteResult, error) {
+func (n *rpcNode) Execute(ctx glowflow.Context, msg *glowflow.Message) (glowflow.ExecuteResult, error) {
 	return glowflow.ExecuteResult{
 		RelationType: "rpc",
-		Data:         nil,
+		Msg:          nil,
 	}, nil
 }
 

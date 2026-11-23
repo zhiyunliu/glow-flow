@@ -8,7 +8,7 @@ import (
 )
 
 type Dispatcher interface {
-	Dispatch(ctx Context, flow *CompiledChain, data any) (err error)
+	Dispatch(ctx Context, flow *CompiledChain, msg *Message) (err error)
 }
 
 type dispatcher struct{}
@@ -21,7 +21,7 @@ func NewDispatcher() Dispatcher {
 	return &dispatcher{}
 }
 
-func (d *dispatcher) Dispatch(ctx Context, flow *CompiledChain, data any) error {
+func (d *dispatcher) Dispatch(ctx Context, flow *CompiledChain, msg *Message) error {
 	if ctx == nil {
 		return fmt.Errorf("context is nil")
 	}
@@ -30,16 +30,16 @@ func (d *dispatcher) Dispatch(ctx Context, flow *CompiledChain, data any) error 
 	}
 	var asyncGroup errgroup.Group
 	for _, node := range flow.StartNodes {
-		asyncGroup.Go(d.asyncCall(ctx, &asyncGroup, flow, node, data))
+		asyncGroup.Go(d.asyncCall(ctx, &asyncGroup, flow, node, msg))
 	}
 	return nil
 }
 
-func (d *dispatcher) dispatchNode(ctx Context, asyncGroup *errgroup.Group, flow *CompiledChain, node CompiledNode, data any) error {
+func (d *dispatcher) dispatchNode(ctx Context, asyncGroup *errgroup.Group, flow *CompiledChain, node CompiledNode, msg *Message) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	result, err := node.Execute(ctx, data)
+	result, err := node.Execute(ctx, msg)
 	if err != nil {
 		return fmt.Errorf("execute node %s: %w", node.Id(), err)
 	}
@@ -49,14 +49,14 @@ func (d *dispatcher) dispatchNode(ctx Context, asyncGroup *errgroup.Group, flow 
 
 	nextNodes := flow.NextNodes(node.Id(), result.RelationType)
 	for _, nextNode := range nextNodes {
-		asyncGroup.Go(d.asyncCall(ctx, asyncGroup, flow, nextNode, result.Data))
+		asyncGroup.Go(d.asyncCall(ctx, asyncGroup, flow, nextNode, result.Msg))
 	}
 	return nil
 }
 
-func (d *dispatcher) asyncCall(ctx Context, asyncGroup *errgroup.Group, flow *CompiledChain, node CompiledNode, data any) func() error {
+func (d *dispatcher) asyncCall(ctx Context, asyncGroup *errgroup.Group, flow *CompiledChain, node CompiledNode, msg *Message) func() error {
 	return func() error {
-		return d.dispatchNode(ctx, asyncGroup, flow, node, data)
+		return d.dispatchNode(ctx, asyncGroup, flow, node, msg)
 	}
 }
 
