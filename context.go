@@ -16,6 +16,18 @@ func NewContext(ctx context.Context, instanceID string) Context {
 	return &contextImpl{instanceID: instanceID, ctx: ctx}
 }
 
+// WithTimeout 派生带超时的流程上下文，保留 parent 中的值及执行作用域
+func WithTimeout(parent Context, timeout time.Duration) (Context, context.CancelFunc) {
+	ctx, cancel := context.WithTimeout(parent, timeout)
+	return NewContext(ctx, parent.GetInstanceID()), cancel
+}
+
+// WithCancel 派生可取消的流程上下文，保留 parent 中的值及执行作用域
+func WithCancel(parent Context) (Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(parent)
+	return NewContext(ctx, parent.GetInstanceID()), cancel
+}
+
 type contextImpl struct {
 	instanceID string
 	ctx        context.Context

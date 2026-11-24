@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"golang.org/x/sync/errgroup"
 )
 
 type Dispatcher interface {
@@ -21,6 +20,8 @@ func NewDispatcher() Dispatcher {
 	return &dispatcher{}
 }
 
+// Dispatch 从起始节点开始并行执行流程，等待所有分支结束后返回首个节点执行错误。
+// 节点返回 error(或 ExecuteResult.Error)时结束所在分支，不影响其他分支。
 func (d *dispatcher) Dispatch(ctx Context, flow *CompiledChain, msg *Message) error {
 	if ctx == nil {
 		return fmt.Errorf("context is nil")
@@ -28,36 +29,7 @@ func (d *dispatcher) Dispatch(ctx Context, flow *CompiledChain, msg *Message) er
 	if flow == nil {
 		return fmt.Errorf("compiled chain is nil")
 	}
-	var asyncGroup errgroup.Group
-	for _, node := range flow.StartNodes {
-		asyncGroup.Go(d.asyncCall(ctx, &asyncGroup, flow, node, msg))
-	}
-	return nil
-}
-
-func (d *dispatcher) dispatchNode(ctx Context, asyncGroup *errgroup.Group, flow *CompiledChain, node CompiledNode, msg *Message) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	result, err := node.Execute(ctx, msg)
-	if err != nil {
-		return fmt.Errorf("execute node %s: %w", node.Id(), err)
-	}
-	if result.Error != nil {
-		return fmt.Errorf("execute node %s: %w", node.Id(), result.Error)
-	}
-
-	nextNodes := flow.NextNodes(node.Id(), result.RelationType)
-	for _, nextNode := range nextNodes {
-		asyncGroup.Go(d.asyncCall(ctx, asyncGroup, flow, nextNode, result.Msg))
-	}
-	return nil
-}
-
-func (d *dispatcher) asyncCall(ctx Context, asyncGroup *errgroup.Group, flow *CompiledChain, node CompiledNode, msg *Message) func() error {
-	return func() error {
-		return d.dispatchNode(ctx, asyncGroup, flow, node, msg)
-	}
+	return newScope(flow, executeOptions{}).run(ctx, flow.StartNodes, msg).Err
 }
 
 func newInstanceID() (string, error) {
