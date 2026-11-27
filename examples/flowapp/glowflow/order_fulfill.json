@@ -1,0 +1,180 @@
+{
+	"id": "order_fulfill",
+	"version": "1.0.0",
+	"metadata": {
+		"id": "order_fulfill",
+		"name": "订单履约",
+		"status": 1
+	},
+	"endpoints": [],
+	"nodes": [
+		{
+			"id": "f_fork",
+			"type": "fork",
+			"name": "开始履约"
+		},
+		{
+			"id": "f_reserve",
+			"type": "for",
+			"name": "逐个预占库存",
+			"extparams": {
+				"range": "msg.items",
+				"do": "f_reserve_item",
+				"mode": "merge"
+			}
+		},
+		{
+			"id": "f_reserve_item",
+			"type": "rpccall",
+			"name": "预占商品库存",
+			"extparams": {
+				"service": "grpc://127.0.0.1:18082/stock/reserve",
+				"timeout": "3s"
+			}
+		},
+		{
+			"id": "f_item_ok",
+			"type": "exprfilter",
+			"name": "预占成功",
+			"extparams": {
+				"expr": "msg.reserved == true"
+			}
+		},
+		{
+			"id": "f_stop",
+			"type": "break",
+			"name": "库存不足停止预占"
+		},
+		{
+			"id": "f_join",
+			"type": "join",
+			"name": "合并预占结果",
+			"extparams": {
+				"mergetomap": true,
+				"timeout": "30s"
+			}
+		},
+		{
+			"id": "f_all_reserved",
+			"type": "jsfilter",
+			"name": "全部预占成功",
+			"extparams": {
+				"script": "var reserved = msg.f_reserve || [];\nreturn reserved.length === msg.items.length && reserved.every(function (r) { return r.reserved === true; });"
+			}
+		},
+		{
+			"id": "f_out_of_stock",
+			"type": "template",
+			"name": "缺货说明",
+			"extparams": {
+				"template": "订单{{ .msg.order_no }}缺货：{{ range .msg.f_reserve }}{{ if not .reserved }}{{ .sku }}({{ .reason }}) {{ end }}{{ end }}"
+			}
+		},
+		{
+			"id": "f_pack",
+			"type": "while",
+			"name": "逐件打包",
+			"extparams": {
+				"condition": "(msg.packed ?? 0) < msg.total_qty",
+				"do": "f_pack_step",
+				"mode": "replace",
+				"maxloops": 100
+			}
+		},
+		{
+			"id": "f_pack_step",
+			"type": "jstransform",
+			"name": "打包一件",
+			"extparams": {
+				"script": "msg.packed = (msg.packed || 0) + 1;\nmsg.boxes = msg.boxes || [];\nmsg.boxes.push(msg.order_no + \"-BOX\" + msg.packed);\nreturn msg;"
+			}
+		},
+		{
+			"id": "f_pack_wait",
+			"type": "delay",
+			"name": "打包耗时",
+			"extparams": {
+				"delay": "20ms"
+			}
+		},
+		{
+			"id": "f_notify",
+			"type": "groupaction",
+			"name": "发货通知",
+			"extparams": {
+				"nodeids": ["f_sms", "f_points", "f_station"],
+				"mergetomap": true,
+				"timeout": "10s"
+			}
+		},
+		{
+			"id": "f_sms",
+			"type": "httpcall",
+			"name": "发货短信",
+			"extparams": {
+				"service": "http://127.0.0.1:18081/api/sms/send",
+				"method": "POST",
+				"timeout": "3s"
+			}
+		},
+		{
+			"id": "f_points",
+			"type": "rpccall",
+			"name": "发放积分",
+			"extparams": {
+				"service": "grpc://127.0.0.1:18082/points/add",
+				"timeout": "3s"
+			}
+		},
+		{
+			"id": "f_station",
+			"type": "command",
+			"name": "记录打包工位",
+			"extparams": {
+				"command": "hostname",
+				"timeout": "5s"
+			}
+		},
+		{
+			"id": "f_done",
+			"type": "template",
+			"name": "履约结果",
+			"extparams": {
+				"template": "订单{{ .msg.order_no }}履约完成：{{ .msg.content }}；积分+{{ .msg.points }}(余额{{ .msg.balance }})；打包工位{{ .msg.f_station }}"
+			}
+		},
+		{
+			"id": "f_notify_partial",
+			"type": "template",
+			"name": "通知部分失败",
+			"extparams": {
+				"template": "发货通知部分失败：{{ json .msg }}"
+			}
+		},
+		{
+			"id": "f_collect",
+			"type": "custom",
+			"name": "收集结果",
+			"extparams": {
+				"nodetype": "example.collect"
+			}
+		}
+	],
+	"connections": [
+		{"from_id": "f_fork", "to_id": "f_reserve", "type": "success"},
+		{"from_id": "f_fork", "to_id": "f_join", "type": "success"},
+		{"from_id": "f_reserve", "to_id": "f_join", "type": "success"},
+		{"from_id": "f_reserve_item", "to_id": "f_item_ok", "type": "success"},
+		{"from_id": "f_item_ok", "to_id": "f_stop", "type": "false"},
+		{"from_id": "f_join", "to_id": "f_all_reserved", "type": "success"},
+		{"from_id": "f_all_reserved", "to_id": "f_pack", "type": "true"},
+		{"from_id": "f_all_reserved", "to_id": "f_out_of_stock", "type": "false"},
+		{"from_id": "f_out_of_stock", "to_id": "f_collect", "type": "success"},
+		{"from_id": "f_pack_step", "to_id": "f_pack_wait", "type": "success"},
+		{"from_id": "f_pack", "to_id": "f_notify", "type": "success"},
+		{"from_id": "f_notify", "to_id": "f_done", "type": "success"},
+		{"from_id": "f_notify", "to_id": "f_notify_partial", "type": "failure"},
+		{"from_id": "f_done", "to_id": "f_collect", "type": "success"},
+		{"from_id": "f_notify_partial", "to_id": "f_collect", "type": "success"}
+	]
+}

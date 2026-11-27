@@ -1,0 +1,155 @@
+{
+	"id": "device_alarm",
+	"version": "1.0.0",
+	"metadata": {
+		"id": "device_alarm",
+		"name": "设备告警",
+		"status": 1
+	},
+	"endpoints": [],
+	"nodes": [
+		{
+			"id": "d_validate",
+			"type": "exprfilter",
+			"name": "数据完整性检查",
+			"extparams": {
+				"expr": "msg.device_id != nil && msg.temperature != nil && msg.humidity != nil && msg.battery != nil"
+			}
+		},
+		{
+			"id": "d_invalid",
+			"type": "template",
+			"name": "数据不完整",
+			"extparams": {
+				"template": "设备数据不完整：{{ json .msg }}"
+			}
+		},
+		{
+			"id": "d_fork",
+			"type": "fork",
+			"name": "并行检测"
+		},
+		{
+			"id": "d_check",
+			"type": "inclusive",
+			"name": "告警条件",
+			"extparams": {
+				"cases": [
+					{"case": "msg.temperature > 50", "then": "hot"},
+					{"case": "msg.humidity > 80", "then": "wet"},
+					{"case": "msg.battery < 20", "then": "lowbattery"}
+				]
+			}
+		},
+		{
+			"id": "d_hot",
+			"type": "template",
+			"name": "高温告警",
+			"extparams": {
+				"template": "温度过高({{ .msg.temperature }}℃)"
+			}
+		},
+		{
+			"id": "d_wet",
+			"type": "exprtransform",
+			"name": "高湿告警",
+			"extparams": {
+				"expr": "\"湿度过高(\" + string(msg.humidity) + \"%)\""
+			}
+		},
+		{
+			"id": "d_battery",
+			"type": "jstransform",
+			"name": "低电量告警",
+			"extparams": {
+				"script": "return \"电量不足(\" + msg.battery + \"%)\";"
+			}
+		},
+		{
+			"id": "d_join",
+			"type": "join",
+			"name": "汇总告警",
+			"extparams": {
+				"timeout": "10s"
+			}
+		},
+		{
+			"id": "d_summary",
+			"type": "jstransform",
+			"name": "生成告警摘要",
+			"extparams": {
+				"script": "var device = {}, alarms = [];\nmsg.forEach(function (input) {\n  if (input.nodeId === \"d_fork\") { device = input.data; } else { alarms.push(input.data); }\n});\nalarms.sort();\nreturn {\n  device_id: device.device_id,\n  count: alarms.length,\n  level: alarms.length >= 2 ? \"critical\" : \"warning\",\n  content: alarms.join(\"；\")\n};"
+			}
+		},
+		{
+			"id": "d_has_alarm",
+			"type": "exprfilter",
+			"name": "存在告警",
+			"extparams": {
+				"expr": "msg.count > 0"
+			}
+		},
+		{
+			"id": "d_normal",
+			"type": "exprtransform",
+			"name": "设备正常",
+			"extparams": {
+				"mapping": {
+					"device_id": "msg.device_id",
+					"status": "\"normal\""
+				}
+			}
+		},
+		{
+			"id": "d_notify",
+			"type": "dingtalk",
+			"name": "告警通知",
+			"extparams": {
+				"webhook": "http://127.0.0.1:18081/robot/send?access_token=example-token",
+				"secret": "SECexample",
+				"msgtype": "text",
+				"content": "【${level == \"critical\" ? \"严重\" : \"一般\"}告警】设备${device_id}：${content}",
+				"atall": true
+			}
+		},
+		{
+			"id": "d_save",
+			"type": "xdb",
+			"name": "记录告警",
+			"extparams": {
+				"dbconn": "example",
+				"execmethod": "exec",
+				"execsql": "INSERT INTO dbo.example_alarm_log (device_id, alarm_level, alarm_count, content)\nVALUES (@{device_id}, @{level}, @{count}, @{content})"
+			}
+		},
+		{
+			"id": "d_collect",
+			"type": "custom",
+			"name": "收集结果",
+			"extparams": {
+				"nodetype": "example.collect"
+			}
+		}
+	],
+	"connections": [
+		{"from_id": "d_validate", "to_id": "d_fork", "type": "true"},
+		{"from_id": "d_validate", "to_id": "d_invalid", "type": "false"},
+		{"from_id": "d_invalid", "to_id": "d_collect", "type": "success"},
+		{"from_id": "d_fork", "to_id": "d_check", "type": "success"},
+		{"from_id": "d_fork", "to_id": "d_join", "type": "success"},
+		{"from_id": "d_check", "to_id": "d_hot", "type": "hot"},
+		{"from_id": "d_check", "to_id": "d_wet", "type": "wet"},
+		{"from_id": "d_check", "to_id": "d_battery", "type": "lowbattery"},
+		{"from_id": "d_hot", "to_id": "d_join", "type": "success"},
+		{"from_id": "d_wet", "to_id": "d_join", "type": "success"},
+		{"from_id": "d_battery", "to_id": "d_join", "type": "success"},
+		{"from_id": "d_join", "to_id": "d_summary", "type": "success"},
+		{"from_id": "d_summary", "to_id": "d_has_alarm", "type": "success"},
+		{"from_id": "d_has_alarm", "to_id": "d_notify", "type": "true"},
+		{"from_id": "d_has_alarm", "to_id": "d_normal", "type": "false"},
+		{"from_id": "d_normal", "to_id": "d_collect", "type": "success"},
+		{"from_id": "d_notify", "to_id": "d_save", "type": "success"},
+		{"from_id": "d_notify", "to_id": "d_save", "type": "failure"},
+		{"from_id": "d_save", "to_id": "d_collect", "type": "success"}
+	]
+}

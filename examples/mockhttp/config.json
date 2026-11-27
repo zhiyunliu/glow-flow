@@ -1,0 +1,17 @@
+{
+	"app": {
+		"mode": "release",
+		"ip_mask": "192.168"
+	},
+	"servers": {
+		"apiserver": {
+			"config": {
+				"addr": ":18081",
+				"status": "start",
+				"read_timeout": 30,
+				"write_timeout": 30,
+				"read_header_timeout": 30
+			}
+		}
+	}
+}

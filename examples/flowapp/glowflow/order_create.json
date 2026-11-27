@@ -1,0 +1,221 @@
+{
+	"id": "order_create",
+	"version": "1.0.0",
+	"metadata": {
+		"id": "order_create",
+		"name": "订单创建",
+		"status": 1
+	},
+	"endpoints": [],
+	"nodes": [
+		{
+			"id": "c_validate",
+			"type": "exprfilter",
+			"name": "订单校验",
+			"extparams": {
+				"expr": "(msg.order_no ?? \"\") != \"\" && len(msg.items ?? []) > 0 && all(msg.items, .qty > 0 && .price > 0)"
+			}
+		},
+		{
+			"id": "c_invalid",
+			"type": "template",
+			"name": "校验失败",
+			"extparams": {
+				"template": "订单校验失败：{{ json .msg }}"
+			}
+		},
+		{
+			"id": "c_calc",
+			"type": "jstransform",
+			"name": "计算金额",
+			"extparams": {
+				"script": "var amount = 0, qty = 0;\nmsg.items.forEach(function (item) {\n  item.subtotal = Math.round(item.price * item.qty * 100) / 100;\n  amount += item.subtotal;\n  qty += item.qty;\n});\nmsg.amount = Math.round(amount * 100) / 100;\nmsg.total_qty = qty;\nreturn msg;"
+			}
+		},
+		{
+			"id": "c_blacklist",
+			"type": "luafilter",
+			"name": "黑名单检查",
+			"extparams": {
+				"script": "local blocked = { U9999 = true, U6666 = true }\nreturn not blocked[msg.user_id]"
+			}
+		},
+		{
+			"id": "c_blocked",
+			"type": "template",
+			"name": "拦截说明",
+			"extparams": {
+				"template": "用户{{ .msg.user_id }}已被限制下单，订单{{ .msg.order_no }}已拦截"
+			}
+		},
+		{
+			"id": "c_blocked_end",
+			"type": "end",
+			"name": "结束"
+		},
+		{
+			"id": "c_fork",
+			"type": "fork",
+			"name": "并行查询风控与会员"
+		},
+		{
+			"id": "c_risk",
+			"type": "rpccall",
+			"name": "风控评估",
+			"extparams": {
+				"service": "grpc://127.0.0.1:18082/risk/evaluate",
+				"timeout": "3s"
+			}
+		},
+		{
+			"id": "c_member",
+			"type": "httpcall",
+			"name": "会员信息",
+			"extparams": {
+				"service": "http://127.0.0.1:18081/api/member/profile?user_id=${user_id}",
+				"method": "GET",
+				"headers": {
+					"X-Order-No": "${order_no}"
+				},
+				"timeout": "3s"
+			}
+		},
+		{
+			"id": "c_join",
+			"type": "join",
+			"name": "汇总订单信息",
+			"extparams": {
+				"mergetomap": true,
+				"timeout": "10s"
+			}
+		},
+		{
+			"id": "c_price",
+			"type": "jstransform",
+			"name": "会员折扣",
+			"extparams": {
+				"script": "var discount = msg.discount || 1;\nmsg.member_level = msg.member_level || \"normal\";\nmsg.pay_amount = Math.round(msg.amount * discount * 100) / 100;\nreturn msg;"
+			}
+		},
+		{
+			"id": "c_route",
+			"type": "switch",
+			"name": "风险分流",
+			"extparams": {
+				"cases": [
+					{"case": "msg.risk_level == \"high\"", "then": "high"},
+					{"case": "msg.risk_level == nil || msg.risk_level == \"medium\" || msg.pay_amount >= 5000", "then": "review"}
+				]
+			}
+		},
+		{
+			"id": "c_alert",
+			"type": "dingtalk",
+			"name": "高风险告警",
+			"extparams": {
+				"target": "group",
+				"msgtype": "markdown",
+				"webhook": "http://127.0.0.1:18081/robot/send?access_token=example-token",
+				"secret": "SECexample",
+				"title": "高风险订单告警",
+				"content": "### 高风险订单告警\n- 订单号：${order_no}\n- 用户：${user_id}\n- 应付金额：${pay_amount}\n- 风险评分：${risk_score}\n- 原因：${risk_reason}",
+				"atmobiles": ["13800000000"],
+				"timeout": "5s"
+			}
+		},
+		{
+			"id": "c_rejected",
+			"type": "template",
+			"name": "拒单说明",
+			"extparams": {
+				"template": "订单{{ .msg.order_no }}风险过高已拒单(风险评分{{ .msg.risk_score }}，{{ .msg.risk_reason }})"
+			}
+		},
+		{
+			"id": "c_review",
+			"type": "exprtransform",
+			"name": "转人工审核",
+			"extparams": {
+				"mapping": {
+					"order_no": "msg.order_no",
+					"pay_amount": "msg.pay_amount",
+					"status": "\"pending_review\"",
+					"reason": "msg.risk_reason ?? \"风控服务不可用\""
+				}
+			}
+		},
+		{
+			"id": "c_publish",
+			"type": "mqp",
+			"name": "发布下单事件",
+			"extparams": {
+				"queuekey": "glowflow.example.order.created",
+				"timeout": "3s"
+			}
+		},
+		{
+			"id": "c_save",
+			"type": "xdb",
+			"name": "保存订单",
+			"extparams": {
+				"dbconn": "example",
+				"execmethod": "firstas",
+				"execsql": "INSERT INTO dbo.example_order (order_no, user_id, amount, pay_amount, total_qty, risk_level, member_level, [status])\nOUTPUT inserted.id, inserted.order_no, inserted.pay_amount, inserted.[status]\nVALUES (@{order_no}, @{user_id}, @{amount}, @{pay_amount}, @{total_qty}, @{risk_level}, @{member_level}, 'created')"
+			}
+		},
+		{
+			"id": "c_result",
+			"type": "exprtransform",
+			"name": "下单结果",
+			"extparams": {
+				"expr": "{\"order_id\": msg.id, \"order_no\": msg.order_no, \"pay_amount\": msg.pay_amount, \"status\": msg.status}"
+			}
+		},
+		{
+			"id": "c_failed",
+			"type": "template",
+			"name": "处理失败",
+			"extparams": {
+				"template": "订单{{ .msg.order_no }}处理失败，请稍后重试"
+			}
+		},
+		{
+			"id": "c_collect",
+			"type": "custom",
+			"name": "收集结果",
+			"extparams": {
+				"nodetype": "example.collect"
+			}
+		}
+	],
+	"connections": [
+		{"from_id": "c_validate", "to_id": "c_calc", "type": "true"},
+		{"from_id": "c_validate", "to_id": "c_invalid", "type": "false"},
+		{"from_id": "c_validate", "to_id": "c_invalid", "type": "failure"},
+		{"from_id": "c_invalid", "to_id": "c_collect", "type": "success"},
+		{"from_id": "c_calc", "to_id": "c_blacklist", "type": "success"},
+		{"from_id": "c_blacklist", "to_id": "c_fork", "type": "true"},
+		{"from_id": "c_blacklist", "to_id": "c_blocked", "type": "false"},
+		{"from_id": "c_blocked", "to_id": "c_blocked_end", "type": "success"},
+		{"from_id": "c_fork", "to_id": "c_risk", "type": "success"},
+		{"from_id": "c_fork", "to_id": "c_member", "type": "success"},
+		{"from_id": "c_fork", "to_id": "c_join", "type": "success"},
+		{"from_id": "c_risk", "to_id": "c_join", "type": "success"},
+		{"from_id": "c_member", "to_id": "c_join", "type": "success"},
+		{"from_id": "c_join", "to_id": "c_price", "type": "success"},
+		{"from_id": "c_price", "to_id": "c_route", "type": "success"},
+		{"from_id": "c_route", "to_id": "c_alert", "type": "high"},
+		{"from_id": "c_route", "to_id": "c_review", "type": "review"},
+		{"from_id": "c_route", "to_id": "c_publish", "type": "default"},
+		{"from_id": "c_alert", "to_id": "c_rejected", "type": "success"},
+		{"from_id": "c_alert", "to_id": "c_rejected", "type": "failure"},
+		{"from_id": "c_rejected", "to_id": "c_collect", "type": "success"},
+		{"from_id": "c_review", "to_id": "c_collect", "type": "success"},
+		{"from_id": "c_publish", "to_id": "c_save", "type": "success"},
+		{"from_id": "c_publish", "to_id": "c_failed", "type": "failure"},
+		{"from_id": "c_save", "to_id": "c_result", "type": "success"},
+		{"from_id": "c_save", "to_id": "c_failed", "type": "failure"},
+		{"from_id": "c_result", "to_id": "c_collect", "type": "success"},
+		{"from_id": "c_failed", "to_id": "c_collect", "type": "success"}
+	]
+}

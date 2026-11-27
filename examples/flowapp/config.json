@@ -1,0 +1,68 @@
+{
+	"app": {
+		"mode": "release",
+		"ip_mask": "192.168"
+	},
+	"dbs": {
+		"example": {
+			"proto": "sqlserver",
+			"conn": "server=127.0.0.1;port=1433;database=glowflow_example;user id=sa;password={GLOWFLOW_DB_PASSWORD};encrypt=disable;app name=glowflow-example",
+			"max_open": 10,
+			"max_idle": 5,
+			"life_time": 600
+		}
+	},
+	"queues": {
+		"default": {
+			"proto": "redis",
+			"addr": "redis://local"
+		}
+	},
+	"redis": {
+		"local": {
+			"addrs": ["127.0.0.1:6379"],
+			"db": 5,
+			"dial_timeout": 10,
+			"read_timeout": 10,
+			"write_timeout": 10,
+			"pool_size": 10
+		}
+	},
+	"xhttp": {
+		"default": {
+			"proto": "xhttp",
+			"conn_timeout": 5
+		}
+	},
+	"rpcs": {
+		"default": {
+			"proto": "grpc",
+			"balancer": "round_robin",
+			"conn_timeout": 5
+		}
+	},
+	"servers": {
+		"apiserver": {
+			"config": {
+				"addr": ":18080",
+				"status": "start",
+				"read_timeout": 30,
+				"write_timeout": 60,
+				"read_header_timeout": 30
+			}
+		},
+		"mqcserver": {
+			"config": {
+				"addr": "queues://default",
+				"status": "start"
+			},
+			"tasks": [
+				{"queue": "glowflow.example.order.created", "service": "/order/created", "concurrency": 2}
+			]
+		}
+	},
+	"flowapp": {
+		"fulfill_chain": "order_fulfill",
+		"run_timeout": 30
+	}
+}

@@ -1,0 +1,80 @@
+### 已加载的流程
+GET http://127.0.0.1:18080/flow/list
+
+### 重新加载流程定义(修改 flowapp/glowflow/*.json 后调用)
+POST http://127.0.0.1:18080/flow/reload
+
+### order_create：正常下单(会员折扣 → 发布下单事件触发 order_fulfill → 保存订单)
+POST http://127.0.0.1:18080/flow/run
+Content-Type: application/json
+
+{"chain": "order_create", "data": {"order_no": "SO20261127001", "user_id": "U1001", "items": [{"sku": "A001", "name": "机械键盘", "price": 399, "qty": 1}, {"sku": "B002", "name": "无线鼠标", "price": 89.5, "qty": 2}]}}
+
+### order_create：风控名单用户 → 钉钉告警 → 拒单
+POST http://127.0.0.1:18080/flow/run
+Content-Type: application/json
+
+{"chain": "order_create", "data": {"order_no": "SO20261127010", "user_id": "U7001", "items": [{"sku": "A001", "price": 399, "qty": 1}]}}
+
+### order_create：金额偏高 → 转人工审核
+POST http://127.0.0.1:18080/flow/run
+Content-Type: application/json
+
+{"chain": "order_create", "data": {"order_no": "SO20261127011", "user_id": "U3003", "items": [{"sku": "C003", "price": 4999, "qty": 1}]}}
+
+### order_create：黑名单用户 → end 节点结束
+POST http://127.0.0.1:18080/flow/run
+Content-Type: application/json
+
+{"chain": "order_create", "data": {"order_no": "SO20261127012", "user_id": "U9999", "items": [{"sku": "A001", "price": 399, "qty": 1}]}}
+
+### order_create：订单校验失败
+POST http://127.0.0.1:18080/flow/run
+Content-Type: application/json
+
+{"chain": "order_create", "data": {"order_no": "SO20261127013", "user_id": "U1001", "items": []}}
+
+### order_create：会员不存在(httpcall 失败，join 仍汇聚，按普通会员处理)
+POST http://127.0.0.1:18080/flow/run
+Content-Type: application/json
+
+{"chain": "order_create", "data": {"order_no": "SO20261127014", "user_id": "U4040", "items": [{"sku": "A001", "price": 100, "qty": 2}]}}
+
+### order_fulfill：正常履约
+POST http://127.0.0.1:18080/flow/run
+Content-Type: application/json
+
+{"chain": "order_fulfill", "data": {"order_no": "SO20261127002", "user_id": "U2002", "pay_amount": 1288.5, "total_qty": 3, "items": [{"sku": "A001", "qty": 1}, {"sku": "B002", "qty": 2}]}}
+
+### order_fulfill：X 开头的商品缺货 → break 停止预占
+POST http://127.0.0.1:18080/flow/run
+Content-Type: application/json
+
+{"chain": "order_fulfill", "data": {"order_no": "SO20261127003", "user_id": "U2002", "pay_amount": 99, "total_qty": 4, "items": [{"sku": "A001", "qty": 1}, {"sku": "X900", "qty": 1}, {"sku": "B002", "qty": 2}]}}
+
+### device_alarm：高温 + 高湿
+POST http://127.0.0.1:18080/flow/run
+Content-Type: application/json
+
+{"chain": "device_alarm", "data": {"device_id": "DEV-001", "temperature": 56.5, "humidity": 85, "battery": 60}}
+
+### device_alarm：设备正常
+POST http://127.0.0.1:18080/flow/run
+Content-Type: application/json
+
+{"chain": "device_alarm", "data": {"device_id": "DEV-002", "temperature": 25, "humidity": 40, "battery": 90}}
+
+### device_alarm：数据不完整
+POST http://127.0.0.1:18080/flow/run
+Content-Type: application/json
+
+{"chain": "device_alarm", "data": {"device_id": "DEV-003", "temperature": 25}}
+
+### order_query：查询用户最近订单
+POST http://127.0.0.1:18080/flow/run
+Content-Type: application/json
+
+{"chain": "order_query", "data": {"user_id": "U1001"}}
+
+### mockhttp：查看收到的钉钉消息
+GET http://127.0.0.1:18081/robot/messages

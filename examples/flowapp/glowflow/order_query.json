@@ -1,0 +1,52 @@
+{
+	"id": "order_query",
+	"version": "1.0.0",
+	"metadata": {
+		"id": "order_query",
+		"name": "订单查询",
+		"status": 1
+	},
+	"endpoints": [],
+	"nodes": [
+		{
+			"id": "q_query",
+			"type": "xdb",
+			"name": "查询最近订单",
+			"extparams": {
+				"dbconn": "example",
+				"execmethod": "queryas",
+				"execsql": "SELECT TOP 5 id, order_no, user_id, pay_amount, risk_level, member_level, [status], CONVERT(VARCHAR(19), create_time, 120) AS create_time\nFROM dbo.example_order\nWHERE user_id = @{user_id}\nORDER BY id DESC"
+			}
+		},
+		{
+			"id": "q_format",
+			"type": "exprtransform",
+			"name": "整理结果",
+			"extparams": {
+				"expr": "{\"count\": len(msg), \"total_pay_amount\": sum(map(msg, float(.pay_amount))), \"orders\": msg}"
+			}
+		},
+		{
+			"id": "q_failed",
+			"type": "template",
+			"name": "查询失败",
+			"extparams": {
+				"template": "查询用户{{ .msg.user_id }}的订单失败"
+			}
+		},
+		{
+			"id": "q_collect",
+			"type": "custom",
+			"name": "收集结果",
+			"extparams": {
+				"nodetype": "example.collect"
+			}
+		}
+	],
+	"connections": [
+		{"from_id": "q_query", "to_id": "q_format", "type": "success"},
+		{"from_id": "q_query", "to_id": "q_failed", "type": "failure"},
+		{"from_id": "q_format", "to_id": "q_collect", "type": "success"},
+		{"from_id": "q_failed", "to_id": "q_collect", "type": "success"}
+	]
+}
